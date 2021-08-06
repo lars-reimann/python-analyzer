@@ -16,3 +16,8 @@ optional arguments:
 ```shell
 library-analyzer count -s "D:\Kaggle Kernels" -e "D:\excluded_files.txt" -o "D:\counter"
 ```
+
+Example query on `merged_count`:
+```js
+Object.values(merged_count.parameters).map(it => Object.values(it).filter(value => value < 1000).length).reduce((a, b) => a + b, 0)
+```
