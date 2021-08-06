@@ -1,14 +1,18 @@
-# template-base
+# library-analyzer
 
-**TODOs** after creating a repository based on this template:
+```text
+usage: library-analyzer [-h] {count} ...
 
-1. Update [package.json](package.json):
-    - name
-    - homepage
-    - repository
-2. Set scopes in [contributing.md](.github/contributing.md).
-3. Decide whether to use pre-commit hooks with husky or a more comprehensive solution with mega-linter.
-4. If using mega-linter:
-    - Create an [allowlist](https://nvuillam.github.io/mega-linter/configuration/#activation-and-deactivation) for linters.
-    - Choose a [flavor](https://nvuillam.github.io/mega-linter/flavors/) of mega-linter.
-5. Update this README.
+Analyze Python code.
+
+positional arguments:
+  {count}
+    count     Count how often functions are called/parameters are used and with which values.
+
+optional arguments:
+  -h, --help  show this help message and exit
+```
+
+```shell
+library-analyzer count -s "D:\Kaggle Kernels" -e "D:\excluded_files.txt" -o "D:\counter.json"
+```

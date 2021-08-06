@@ -22,15 +22,9 @@ allowed. Pick the one that fits best:
 | `revert`   | Reverting a previous commit                                               |
 | `chore`    | Other changes that don't modify src or test files                         |
 
-Possible **scopes** are:
-
-| Scope          | Meaning                                                                           |
-| -------------- | --------------------------------------------------------------------------------- |
-| `exampleScope` | **If you still see this option I forgot to change this part of the template.** 😉 |
-
 Examples:
 
--   `feat(exampleScope): fancy new feature`
+-   `feat: fancy new feature`
 -   `docs: write contributing guide`
 -   `refactor!: drop support for older browsers` (the exclamation mark denotes a breaking change)
 
