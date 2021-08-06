@@ -1,4 +1,3 @@
-import concurrent.futures as promises
 import multiprocessing
 import sys
 import time
@@ -12,13 +11,36 @@ from astroid.helpers import safe_infer
 
 from .utils import ASTWalker, list_python_files, initialize_and_read_exclude_file
 
+relevant_prefixes = {
+    # "bokeh",
+    # "catboost",
+    # "cntk",
+    # "eli5",
+    # "gym",
+    # "keras",
+    # "lightgbm",
+    # "matplotlib",
+    # "nltk"
+    # "numpy",
+    # "pandas",
+    # "plotly",
+    # "pydot",
+    # "scipy",
+    # "seaborn",
+    "sklearn",
+    # "spacy",
+    # "statsmodels",
+    # "tensorflow",
+    # "torch",
+    # "xgboost"
+}
+
 
 class CallAndParameterCounter:
     def __init__(self) -> None:
         self.call_counter: Counter[str, int] = Counter()
         self.parameter_counter: dict[str, Counter[str, int]] = {}
 
-    # noinspection PyMethodMayBeStatic
     def visit_call(self, node: astroid.Call):
         called = _analyze_declaration_called_by(node)
         if called is None:
@@ -56,7 +78,7 @@ def _analyze_declaration_called_by(node: astroid.Call) -> Optional[tuple[str, as
     """
 
     called = safe_infer(node.func)
-    if called is None or isinstance(called, astroid.Lambda) or not _is_relevant(called.qname()):
+    if called is None or isinstance(called, astroid.Lambda) or not _is_relevant_qualified_name(called.qname()):
         return None
 
     n_implicit_parameters = _n_implicit_parameters(called)
@@ -70,10 +92,6 @@ def _analyze_declaration_called_by(node: astroid.Call) -> Optional[tuple[str, as
         return called.qname(), called.args, n_implicit_parameters
     else:
         return None
-
-
-def _is_relevant(qualified_name: str) -> bool:
-    return any(qualified_name.startswith(prefix) for prefix in relevant_prefixes)
 
 
 def _n_implicit_parameters(called: astroid.NodeNG) -> int:
@@ -158,30 +176,6 @@ if __name__ == '__main__':
     print("====================================================================================================")
     print(f"Program ran in {time.time() - start_time}s")
 
-relevant_prefixes = {
-    # "bokeh",
-    # "catboost",
-    # "cntk",
-    # "eli5",
-    # "gym",
-    # "keras",
-    # "lightgbm",
-    # "matplotlib",
-    # "nltk"
-    # "numpy",
-    # "pandas",
-    # "plotly",
-    # "pydot",
-    # "scipy",
-    # "seaborn",
-    "sklearn",
-    # "spacy",
-    # "statsmodels",
-    # "tensorflow",
-    # "torch",
-    # "xgboost"
-}
-
 
 def count_calls_and_parameters(src_dir: Path, exclude_file: Path, out: Path):
     candidate_python_files = list_python_files(src_dir)
@@ -190,27 +184,19 @@ def count_calls_and_parameters(src_dir: Path, exclude_file: Path, out: Path):
 
     length = len(python_files)
     lock = multiprocessing.Lock()
-    with promises.ProcessPoolExecutor(max_workers=2) as executor:
-        futures = [
-            executor.submit(do_count_calls_and_parameters, python_file, exclude_file, out, index, length, lock)
-            for index, python_file in enumerate(python_files)
-        ]
-        print("waiting")
-        promises.wait(futures)
-        # merge results together (reducer)
-    # print(python_files)
+    with multiprocessing.Pool(initializer=initialize_process_environment, initargs=(lock,)) as pool:
+        for index, python_file in enumerate(python_files):
+            pool.apply(do_count_calls_and_parameters, [python_file, exclude_file, out, index, length])
 
-    # use this for the progress update 1/77000...
-    # print current file name
-    # initialize with old excluded stuff from exclude_file
-    # initialize with previous counter
-    # go through each file
-    # make sure nothing crashes (catch exceptions)
-    # count calls, parameters uses, individual values for parameters
-    # keep track of line numbers
-    # update out file
-    # update excluded
-    # run analysis in parallel (Pool, threading, multiprocessing => concurrent.futures)
+    pool.join()
+
+    # TODO merge results together (reducer)
+
+
+def initialize_process_environment(lock: multiprocessing.Lock):
+    # noinspection PyGlobalUndefined
+    global _lock
+    _lock = lock
 
 
 def do_count_calls_and_parameters(
@@ -219,12 +205,29 @@ def do_count_calls_and_parameters(
     out: Path,
     index: int,
     length: int,
-    lock: multiprocessing.Lock
 ):
-    with lock:
+    with _lock:
         print(f"Working on {python_file} ({index}/{length})")
         index += 1
 
-    with lock:
+    with open(python_file, "r") as f:
+        source = f.read()
+
+    if _is_relevant_python_file(source):
+        # TODO make sure nothing crashes (catch exceptions)
+        # TODO count calls, parameters uses, individual values for parameters
+        # TODO keep track of line numbers
+        # TODO update out file
+        pass
+
+    with _lock:
         with exclude_file.open("a") as f:
             f.write(f"{python_file}\n")
+
+
+def _is_relevant_qualified_name(qualified_name: str) -> bool:
+    return any(qualified_name.startswith(prefix) for prefix in relevant_prefixes)
+
+
+def _is_relevant_python_file(source: str) -> bool:
+    return any(prefix in source for prefix in relevant_prefixes)
