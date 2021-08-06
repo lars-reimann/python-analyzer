@@ -1,4 +1,5 @@
 import argparse
+import time
 from pathlib import Path
 
 from .call_and_parameter_counter import count_calls_and_parameters
@@ -37,5 +38,10 @@ def get_args() -> argparse.Namespace:
 def main() -> None:
     args = get_args()
 
+    start_time = time.time()
+
     if args.command == "count":
         count_calls_and_parameters(args.src, args.exclude, args.out)
+
+    print("\n====================================================================================================")
+    print(f"Program ran in {time.time() - start_time}s")
