@@ -74,20 +74,22 @@ def do_count_calls_and_parameters(
         source = f.read()
 
     if _is_relevant_python_file(source):
-        # TODO make sure nothing crashes (catch exceptions)
+        try:
+            call_and_parameter_counter = _CallAndParameterCounter(python_file)
+            ASTWalker(call_and_parameter_counter).walk(astroid.parse(source))
 
-        call_and_parameter_counter = _CallAndParameterCounter(python_file)
-        ASTWalker(call_and_parameter_counter).walk(astroid.parse(source))
+            out_file = out_dir.joinpath(python_file.replace("/", "$$$").replace("\\", "$$$").replace(".py", ".json"))
+            with out_file.open("w") as f:
+                json.dump({
+                    "calls": call_and_parameter_counter.calls,
+                    "parameters": call_and_parameter_counter.parameters,
+                    "values": call_and_parameter_counter.values
+                }, f, indent=4)
+        except astroid.exceptions.AstroidSyntaxError:
+            print("Skipping (invalid syntax)")
 
-        out_file = out_dir.joinpath(python_file.replace("/", "$$$").replace("\\", "$$$").replace(".py", ".json"))
-        with out_file.open("w") as f:
-            json.dump({
-                "calls": call_and_parameter_counter.calls,
-                "parameters": call_and_parameter_counter.parameters,
-                "values": call_and_parameter_counter.values
-            }, f, indent=4)
     else:
-        print("Skipping irrelevant file")
+        print("Skipping (irrelevant file)")
 
     with _lock:
         with exclude_file.open("a") as f:
