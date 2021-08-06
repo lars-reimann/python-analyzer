@@ -44,7 +44,7 @@ def count_calls_and_parameters(src_dir: Path, exclude_file: Path, out_dir: Path)
 
     length = len(python_files)
     lock = multiprocessing.Lock()
-    with multiprocessing.Pool(initializer=initialize_process_environment, initargs=(lock,)) as pool:
+    with multiprocessing.Pool(processes=4, initializer=initialize_process_environment, initargs=(lock,)) as pool:
         for index, python_file in enumerate(python_files):
             pool.apply(do_count_calls_and_parameters, [python_file, exclude_file, out_dir, index, length])
 
@@ -152,6 +152,8 @@ class _CallAndParameterCounter:
             }
 
         for parameter_name in bound_parameters.keys():
+            if parameter_name not in self.parameters[qualified_name]:
+                self.parameters[qualified_name][parameter_name] = []
             self.parameters[qualified_name][parameter_name].append(occurrence)
 
         # Count how often each value is used
@@ -163,6 +165,9 @@ class _CallAndParameterCounter:
 
         for parameter_name, value in bound_parameters.items():
             stringified_value = _stringify_value(value)
+
+            if parameter_name not in self.values[qualified_name]:
+                self.values[qualified_name][parameter_name] = {}
 
             if stringified_value not in self.values[qualified_name][parameter_name]:
                 self.values[qualified_name][parameter_name][stringified_value] = []
