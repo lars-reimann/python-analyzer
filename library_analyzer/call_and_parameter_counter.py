@@ -191,6 +191,38 @@ def _merge_results(out_dir: Path) -> None:
     with out_dir.joinpath("$$$$$merged_counts$$$$$.json").open("w") as f:
         json.dump(result_counts, f, indent=4)
 
+    result_counts_compacts = {
+        callable_name: {
+            "count": len(result_calls[callable_name]),
+            "parameters": {
+                parameter_name: {
+                    "count": len(result_parameters[callable_name][parameter_name]),
+                    "values": {
+                        stringified_value: len(occurrences)
+                        for stringified_value, occurrences in sorted(
+                            values.items(),
+                            key=lambda it: len(it[1]),
+                            reverse=True
+                        )
+                    }
+                }
+                for parameter_name, values in sorted(
+                    parameters.items(),
+                    key=lambda it: len(result_parameters[callable_name][it[0]]),
+                    reverse=True
+                )
+            }
+        }
+        for callable_name, parameters in sorted(
+            result_values.items(),
+            key=lambda it: len(result_calls[it[0]]),
+            reverse=True
+        )
+    }
+
+    with out_dir.joinpath("$$$$$merged_counts_compact$$$$$.json").open("w") as f:
+        json.dump(result_counts_compacts, f, indent=4)
+
 
 def _is_relevant_qualified_name(qualified_name: str) -> bool:
     return any(qualified_name.startswith(prefix) for prefix in relevant_prefixes)
