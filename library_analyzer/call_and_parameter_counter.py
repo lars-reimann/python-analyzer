@@ -45,7 +45,7 @@ def count_calls_and_parameters(src_dir: Path, exclude_file: Path, out_dir: Path)
     length = len(python_files)
 
     lock = multiprocessing.Lock()
-    with multiprocessing.Pool(processes=8, initializer=_initialize_process_environment, initargs=(lock,)) as pool:
+    with multiprocessing.Pool(processes=None, initializer=_initialize_process_environment, initargs=(lock,)) as pool:
         pool.starmap(
             _do_count_calls_and_parameters,
             [[it[1], exclude_file, out_dir, it[0], length] for it in enumerate(python_files)]
