@@ -44,7 +44,7 @@ def count_calls_and_parameters(src_dir: Path, exclude_file: Path, out_dir: Path)
 
     length = len(python_files)
     lock = multiprocessing.Lock()
-    with multiprocessing.Pool(processes=4, initializer=initialize_process_environment, initargs=(lock,)) as pool:
+    with multiprocessing.Pool(processes=8, initializer=initialize_process_environment, initargs=(lock,)) as pool:
         for index, python_file in enumerate(python_files):
             pool.apply(do_count_calls_and_parameters, [python_file, exclude_file, out_dir, index, length])
 
@@ -241,6 +241,9 @@ def _bound_parameters(
     positional_parameter_names = [it.name for it in (parameters.posonlyargs + parameters.args)][n_implicit_parameters:]
 
     for index, arg in enumerate(arguments.positional_arguments):
+        if index >= len(positional_parameter_names):
+            break
+
         result[positional_parameter_names[index]] = arg
 
     return result
