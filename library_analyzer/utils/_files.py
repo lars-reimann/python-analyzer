@@ -21,8 +21,11 @@ def list_python_files(root_dir: Path) -> list[str]:
 
 def initialize_and_read_exclude_file(exclude_file: Path) -> list[str]:
     exclude_file.parent.mkdir(parents=True, exist_ok=True)
-    with exclude_file.open("r+") as f:
-        return _read_lines(f)
+    try:
+        with exclude_file.open("r") as f:
+            return _read_lines(f)
+    except FileNotFoundError:
+        return []
 
 
 def _read_lines(f: TextIO) -> list[str]:

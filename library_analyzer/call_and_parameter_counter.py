@@ -1,7 +1,6 @@
+import json
 import multiprocessing
 import sys
-import time
-from collections import Counter
 from pathlib import Path
 from typing import Optional, Any, Generator
 
@@ -36,10 +35,89 @@ relevant_prefixes = {
 }
 
 
-class CallAndParameterCounter:
-    def __init__(self) -> None:
-        self.call_counter: Counter[str, int] = Counter()
-        self.parameter_counter: dict[str, Counter[str, int]] = {}
+def count_calls_and_parameters(src_dir: Path, exclude_file: Path, out_dir: Path):
+    candidate_python_files = list_python_files(src_dir)
+    excluded_python_files = set(initialize_and_read_exclude_file(exclude_file))
+    python_files = [it for it in candidate_python_files if it not in excluded_python_files]
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    length = len(python_files)
+    lock = multiprocessing.Lock()
+    with multiprocessing.Pool(initializer=initialize_process_environment, initargs=(lock,)) as pool:
+        for index, python_file in enumerate(python_files):
+            pool.apply(do_count_calls_and_parameters, [python_file, exclude_file, out_dir, index, length])
+
+    pool.join()
+
+    # TODO merge results together (reducer)
+
+
+def initialize_process_environment(lock: multiprocessing.Lock):
+    # noinspection PyGlobalUndefined
+    global _lock
+    _lock = lock
+
+
+def do_count_calls_and_parameters(
+    python_file: str,
+    exclude_file: Path,
+    out_dir: Path,
+    index: int,
+    length: int,
+):
+    with _lock:
+        print(f"Working on {python_file} ({index + 1}/{length})")
+        index += 1
+
+    with open(python_file, "r") as f:
+        source = f.read()
+
+    if _is_relevant_python_file(source):
+        # TODO make sure nothing crashes (catch exceptions)
+
+        call_and_parameter_counter = _CallAndParameterCounter(python_file)
+        ASTWalker(call_and_parameter_counter).walk(astroid.parse(source))
+
+        out_file = out_dir.joinpath(python_file.replace("/", "$$$").replace("\\", "$$$").replace(".py", ".json"))
+        with out_file.open("w") as f:
+            json.dump({
+                "calls": call_and_parameter_counter.calls,
+                "parameters": call_and_parameter_counter.parameters,
+                "values": call_and_parameter_counter.values
+            }, f, indent=4)
+
+    with _lock:
+        with exclude_file.open("a") as f:
+            f.write(f"{python_file}\n")
+
+
+def _is_relevant_qualified_name(qualified_name: str) -> bool:
+    return any(qualified_name.startswith(prefix) for prefix in relevant_prefixes)
+
+
+def _is_relevant_python_file(source: str) -> bool:
+    return any(prefix in source for prefix in relevant_prefixes)
+
+
+CallableName = str
+ParameterName = str
+StringifiedValue = str
+FileName = str
+LineNumber = int
+ColumnNumber = int
+Occurrence = tuple[FileName, Optional[LineNumber], Optional[ColumnNumber]]
+CallStore = dict[CallableName, list[Occurrence]]
+ParameterStore = dict[CallableName, dict[ParameterName, list[Occurrence]]]
+ValueStore = dict[CallableName, dict[ParameterName, dict[StringifiedValue, list[Occurrence]]]]
+
+
+class _CallAndParameterCounter:
+    def __init__(self, python_file: str) -> None:
+        self.python_file: str = python_file
+        self.calls: CallStore = {}
+        self.parameters: ParameterStore = {}
+        self.values: ValueStore = {}
 
     def visit_call(self, node: astroid.Call):
         called = _analyze_declaration_called_by(node)
@@ -55,20 +133,36 @@ class CallAndParameterCounter:
         if bound_parameters is None:
             return
 
+        occurrence: Occurrence = (self.python_file, node.lineno, node.col_offset)
+
         # Count how often each method is called
-        self.call_counter[qualified_name] += 1
+        if self.calls[qualified_name] is None:
+            self.calls[qualified_name] = []
+        self.calls[qualified_name].append(occurrence)
 
         # Count how often each parameter is used
-        if qualified_name not in self.parameter_counter:
-            self.parameter_counter[qualified_name] = Counter({
-                name: 0
+        if qualified_name not in self.parameters:
+            self.parameters[qualified_name] = {
+                name: []
                 for name in _all_parameter_names(parameters, n_implicit_parameters)
-            })
+            }
 
         for parameter_name in bound_parameters.keys():
-            self.parameter_counter[qualified_name][parameter_name] += 1
+            self.parameters[qualified_name][parameter_name].append(occurrence)
 
-        # TODO: find values that are commonly used
+        # Count how often each value is used
+        if qualified_name not in self.values:
+            self.values[qualified_name] = {
+                name: {}
+                for name in _all_parameter_names(parameters, n_implicit_parameters)
+            }
+
+        for parameter_name, value in bound_parameters:
+            stringified_value = value.as_string()
+            if stringified_value not in self.values[qualified_name][parameter_name]:
+                self.values[qualified_name][parameter_name][stringified_value] = []
+
+            self.parameters[qualified_name][parameter_name][stringified_value].append(occurrence)
 
 
 def _analyze_declaration_called_by(node: astroid.Call) -> Optional[tuple[str, astroid.Arguments, int]]:
@@ -147,87 +241,3 @@ def _all_parameter_names(parameters: astroid.Arguments, n_implicit_parameters: i
         it.name
         for it in (parameters.posonlyargs + parameters.args + parameters.kwonlyargs)[n_implicit_parameters:]
     )
-
-
-if __name__ == '__main__':
-    start_time = time.time()
-
-    # TODO run in loop for all file
-    # TODO catch exceptions on current file to continue run
-    # TODO save progress after each file
-    # TODO save line numbers & files of calls
-    # TODO save all stats about kernels (hotness, votes, dates, uses etc.)
-    parse_tree = astroid.parse(test2)
-    call_and_parameter_counter = CallAndParameterCounter()
-    ASTWalker(call_and_parameter_counter).walk(parse_tree)
-
-    print("===== Call counter =================================================================================")
-    for callable_qualified_name, count in call_and_parameter_counter.call_counter.items():
-        print(f"{callable_qualified_name}: {count}")
-    print()
-
-    print("===== Parameter counter ============================================================================")
-    for (callable_qualified_name, counter) in call_and_parameter_counter.parameter_counter.items():
-        print(f"{callable_qualified_name}:")
-        for parameter_name, count in counter.items():
-            print(f"   {parameter_name}: {count}")
-    print()
-
-    print("====================================================================================================")
-    print(f"Program ran in {time.time() - start_time}s")
-
-
-def count_calls_and_parameters(src_dir: Path, exclude_file: Path, out: Path):
-    candidate_python_files = list_python_files(src_dir)
-    excluded_python_files = set(initialize_and_read_exclude_file(exclude_file))
-    python_files = [it for it in candidate_python_files if it not in excluded_python_files]
-
-    length = len(python_files)
-    lock = multiprocessing.Lock()
-    with multiprocessing.Pool(initializer=initialize_process_environment, initargs=(lock,)) as pool:
-        for index, python_file in enumerate(python_files):
-            pool.apply(do_count_calls_and_parameters, [python_file, exclude_file, out, index, length])
-
-    pool.join()
-
-    # TODO merge results together (reducer)
-
-
-def initialize_process_environment(lock: multiprocessing.Lock):
-    # noinspection PyGlobalUndefined
-    global _lock
-    _lock = lock
-
-
-def do_count_calls_and_parameters(
-    python_file: str,
-    exclude_file: Path,
-    out: Path,
-    index: int,
-    length: int,
-):
-    with _lock:
-        print(f"Working on {python_file} ({index}/{length})")
-        index += 1
-
-    with open(python_file, "r") as f:
-        source = f.read()
-
-    if _is_relevant_python_file(source):
-        # TODO make sure nothing crashes (catch exceptions)
-        # TODO count calls, parameters uses, individual values for parameters
-        # TODO keep track of line numbers
-        # TODO update out file
-        pass
-
-    with _lock:
-        with exclude_file.open("a") as f:
-            f.write(f"{python_file}\n")
-
-
-def _is_relevant_qualified_name(qualified_name: str) -> bool:
-    return any(qualified_name.startswith(prefix) for prefix in relevant_prefixes)
-
-
-def _is_relevant_python_file(source: str) -> bool:
-    return any(prefix in source for prefix in relevant_prefixes)
