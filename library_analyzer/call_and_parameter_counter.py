@@ -44,7 +44,7 @@ def count_calls_and_parameters(src_dir: Path, exclude_file: Path, out_dir: Path)
 
     length = len(python_files)
     lock = multiprocessing.Lock()
-    with multiprocessing.Pool(processes=8, initializer=initialize_process_environment, initargs=(lock,)) as pool:
+    with multiprocessing.Pool(processes=4, initializer=initialize_process_environment, initargs=(lock,)) as pool:
         for index, python_file in enumerate(python_files):
             pool.apply(do_count_calls_and_parameters, [python_file, exclude_file, out_dir, index, length])
 
@@ -70,26 +70,30 @@ def do_count_calls_and_parameters(
         print(f"Working on {python_file} ({index + 1}/{length})")
         index += 1
 
-    with open(python_file, "r") as f:
-        source = f.read()
+    try:
+        with open(python_file, "r") as f:
+            source = f.read()
 
-    if _is_relevant_python_file(source):
-        try:
+        if _is_relevant_python_file(source):
             call_and_parameter_counter = _CallAndParameterCounter(python_file)
             ASTWalker(call_and_parameter_counter).walk(astroid.parse(source))
 
-            out_file = out_dir.joinpath(python_file.replace("/", "$$$").replace("\\", "$$$").replace(".py", ".json"))
+            out_file = out_dir.joinpath(
+                python_file.replace("/", "$$$").replace("\\", "$$$").replace(".py", ".json")
+            )
             with out_file.open("w") as f:
                 json.dump({
                     "calls": call_and_parameter_counter.calls,
                     "parameters": call_and_parameter_counter.parameters,
                     "values": call_and_parameter_counter.values
                 }, f, indent=4)
-        except astroid.exceptions.AstroidSyntaxError:
-            print("Skipping (invalid syntax)")
+        else:
+            print("Skipping (irrelevant file)")
 
-    else:
-        print("Skipping (irrelevant file)")
+    except UnicodeError:
+        print("Skipping (broken encoding)")
+    except astroid.exceptions.AstroidSyntaxError:
+        print("Skipping (invalid syntax)")
 
     with _lock:
         with exclude_file.open("a") as f:
