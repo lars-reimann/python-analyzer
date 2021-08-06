@@ -96,6 +96,8 @@ def _do_count_calls_and_parameters(
         print("Skipping (broken encoding)")
     except astroid.exceptions.AstroidSyntaxError:
         print("Skipping (invalid syntax)")
+    except RecursionError:
+        print("Skipping (infinite recursion)")
 
     with _lock:
         with exclude_file.open("a") as f:
@@ -109,7 +111,7 @@ def _merge_results(out_dir: Path) -> None:
 
     files = list_files(out_dir, ".json")
     for index, file in enumerate(files):
-        print(f"Merging {file} ({index + 1}/{len(files)}")
+        print(f"Merging {file} ({index + 1}/{len(files)})")
 
         with open(file, "r") as f:
             content = json.load(f)
@@ -157,7 +159,7 @@ def _merge_results(out_dir: Path) -> None:
     }
 
     with out_dir.joinpath("$$$$$merged$$$$$.json").open("w") as f:
-        json.dump(result, f)
+        json.dump(result, f, indent=4)
 
 
 def _is_relevant_qualified_name(qualified_name: str) -> bool:
