@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-from call_and_parameter_counter import count_calls_and_parameters
+from .call_and_parameter_counter import count_calls_and_parameters
 
 
 def get_args() -> argparse.Namespace:

@@ -1,16 +1,16 @@
-import os
+import concurrent.futures as promises
+import multiprocessing
 import sys
 import time
 from collections import Counter
 from pathlib import Path
-from typing import Optional, Callable, Any, Generator
+from typing import Optional, Any, Generator
 
 import astroid
 from astroid.arguments import CallSite
 from astroid.helpers import safe_infer
 
-
-
+from .utils import ASTWalker, list_python_files, initialize_and_read_exclude_file
 
 
 class CallAndParameterCounter:
@@ -73,30 +73,6 @@ def _analyze_declaration_called_by(node: astroid.Call) -> Optional[tuple[str, as
 
 
 def _is_relevant(qualified_name: str) -> bool:
-    relevant_prefixes = {
-        # "bokeh",
-        # "catboost",
-        # "cntk",
-        # "eli5",
-        # "gym",
-        # "keras",
-        # "lightgbm",
-        # "matplotlib",
-        # "nltk"
-        # "numpy",
-        # "pandas",
-        # "plotly",
-        # "pydot",
-        # "scipy",
-        # "seaborn",
-        "sklearn",
-        # "spacy",
-        # "statsmodels",
-        # "tensorflow",
-        # "torch",
-        # "xgboost"
-    }
-
     return any(qualified_name.startswith(prefix) for prefix in relevant_prefixes)
 
 
@@ -182,19 +158,48 @@ if __name__ == '__main__':
     print("====================================================================================================")
     print(f"Program ran in {time.time() - start_time}s")
 
+relevant_prefixes = {
+    # "bokeh",
+    # "catboost",
+    # "cntk",
+    # "eli5",
+    # "gym",
+    # "keras",
+    # "lightgbm",
+    # "matplotlib",
+    # "nltk"
+    # "numpy",
+    # "pandas",
+    # "plotly",
+    # "pydot",
+    # "scipy",
+    # "seaborn",
+    "sklearn",
+    # "spacy",
+    # "statsmodels",
+    # "tensorflow",
+    # "torch",
+    # "xgboost"
+}
 
-def count_calls_and_parameters(src_dir: Path, exclude_file: Path, out_file: Path):
-    print(src_dir)
-    print(exclude_file)
-    print(out_file)
 
-    for root, dirs, files in os.walk(src_dir):
-        for filename in files:
-            if filename.endswith(".py"):
-                print(os.path.join(root, filename))
+def count_calls_and_parameters(src_dir: Path, exclude_file: Path, out: Path):
+    candidate_python_files = list_python_files(src_dir)
+    excluded_python_files = set(initialize_and_read_exclude_file(exclude_file))
+    python_files = [it for it in candidate_python_files if it not in excluded_python_files]
 
-    # create list of files
-    # subtract excluded stuff
+    length = len(python_files)
+    lock = multiprocessing.Lock()
+    with promises.ProcessPoolExecutor(max_workers=2) as executor:
+        futures = [
+            executor.submit(do_count_calls_and_parameters, python_file, exclude_file, out, index, length, lock)
+            for index, python_file in enumerate(python_files)
+        ]
+        print("waiting")
+        promises.wait(futures)
+        # merge results together (reducer)
+    # print(python_files)
+
     # use this for the progress update 1/77000...
     # print current file name
     # initialize with old excluded stuff from exclude_file
@@ -206,3 +211,20 @@ def count_calls_and_parameters(src_dir: Path, exclude_file: Path, out_file: Path
     # update out file
     # update excluded
     # run analysis in parallel (Pool, threading, multiprocessing => concurrent.futures)
+
+
+def do_count_calls_and_parameters(
+    python_file: str,
+    exclude_file: Path,
+    out: Path,
+    index: int,
+    length: int,
+    lock: multiprocessing.Lock
+):
+    with lock:
+        print(f"Working on {python_file} ({index}/{length})")
+        index += 1
+
+    with lock:
+        with exclude_file.open("a") as f:
+            f.write(f"{python_file}\n")

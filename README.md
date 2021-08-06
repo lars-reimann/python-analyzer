@@ -14,5 +14,5 @@ optional arguments:
 ```
 
 ```shell
-library-analyzer count -s "D:\Kaggle Kernels" -e "D:\excluded_files.txt" -o "D:\counter.json"
+library-analyzer count -s "D:\Kaggle Kernels" -e "D:\excluded_files.txt" -o "D:\counter"
 ```
