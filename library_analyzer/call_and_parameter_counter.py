@@ -8,7 +8,7 @@ import astroid
 from astroid.arguments import CallSite
 from astroid.helpers import safe_infer
 
-from .utils import ASTWalker, list_python_files, initialize_and_read_exclude_file
+from .utils import ASTWalker, list_files, initialize_and_read_exclude_file
 
 relevant_prefixes = {
     # "bokeh",
@@ -36,30 +36,32 @@ relevant_prefixes = {
 
 
 def count_calls_and_parameters(src_dir: Path, exclude_file: Path, out_dir: Path):
-    candidate_python_files = list_python_files(src_dir)
+    candidate_python_files = list_files(src_dir, ".py")
     excluded_python_files = set(initialize_and_read_exclude_file(exclude_file))
     python_files = [it for it in candidate_python_files if it not in excluded_python_files]
 
     out_dir.mkdir(parents=True, exist_ok=True)
 
     length = len(python_files)
-    lock = multiprocessing.Lock()
-    with multiprocessing.Pool(processes=4, initializer=initialize_process_environment, initargs=(lock,)) as pool:
-        for index, python_file in enumerate(python_files):
-            pool.apply(do_count_calls_and_parameters, [python_file, exclude_file, out_dir, index, length])
 
+    lock = multiprocessing.Lock()
+    with multiprocessing.Pool(initializer=_initialize_process_environment, initargs=(lock,)) as pool:
+        pool.starmap(
+            _do_count_calls_and_parameters,
+            [[it[1], exclude_file, out_dir, it[0], length] for it in enumerate(python_files)]
+        )
     pool.join()
 
-    # TODO merge results together (reducer)
+    _merge_results(out_dir)
 
 
-def initialize_process_environment(lock: multiprocessing.Lock):
+def _initialize_process_environment(lock: multiprocessing.Lock):
     # noinspection PyGlobalUndefined
     global _lock
     _lock = lock
 
 
-def do_count_calls_and_parameters(
+def _do_count_calls_and_parameters(
     python_file: str,
     exclude_file: Path,
     out_dir: Path,
@@ -98,6 +100,38 @@ def do_count_calls_and_parameters(
     with _lock:
         with exclude_file.open("a") as f:
             f.write(f"{python_file}\n")
+
+
+def _merge_results(out_dir: Path) -> None:
+    result_calls: CallStore = {}
+    result_parameters: ParameterStore = {}
+    result_values: ValueStore = {}
+
+    files = list_files(out_dir, ".json")
+    for index, file in enumerate(files):
+        print(f"Merging {file} ({index + 1}/{len(files)}")
+
+        with open(file, "r") as f:
+            content = json.load(f)
+
+        # merge calls
+        calls: CallStore = content["calls"]
+        # for result
+
+        # merge parameters
+        parameters: ParameterStore = content["parameters"]
+
+        # merge values
+        values: ValueStore = content["values"]
+
+    result = {
+        "calls": result_calls,
+        "parameters": result_parameters,
+        "values": result_values
+    }
+
+    with out_dir.joinpath("$$$$$merged$$$$$.json").open("w") as f:
+        json.dump(result, f)
 
 
 def _is_relevant_qualified_name(qualified_name: str) -> bool:

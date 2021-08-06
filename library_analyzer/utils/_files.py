@@ -3,17 +3,18 @@ from pathlib import Path
 from typing import TextIO
 
 
-def list_python_files(root_dir: Path) -> list[str]:
+def list_files(root_dir: Path, extension: str = "") -> list[str]:
     """
-    :param root_dir: The directory containing the Python files.
-    :return: A list with absolute paths to the Python files.
+    :param root_dir: The directory containing the files.
+    :param extension: The extension the files should have.
+    :return: A list with absolute paths to the files.
     """
 
     result: list[str] = []
 
     for root, _, files in os.walk(root_dir):
         for filename in files:
-            if filename.endswith(".py"):
+            if filename.endswith(extension):
                 result.append(str(os.path.join(root, filename)))
 
     return result
