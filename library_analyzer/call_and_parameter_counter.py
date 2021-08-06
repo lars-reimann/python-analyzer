@@ -164,7 +164,7 @@ class _CallAndParameterCounter:
             if stringified_value not in self.values[qualified_name][parameter_name]:
                 self.values[qualified_name][parameter_name][stringified_value] = []
 
-            self.parameters[qualified_name][parameter_name][stringified_value].append(occurrence)
+            self.values[qualified_name][parameter_name][stringified_value].append(occurrence)
 
 
 def _analyze_declaration_called_by(node: astroid.Call) -> Optional[tuple[str, astroid.Arguments, int]]:
