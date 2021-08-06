@@ -45,7 +45,7 @@ def count_calls_and_parameters(src_dir: Path, exclude_file: Path, out_dir: Path)
     length = len(python_files)
 
     lock = multiprocessing.Lock()
-    with multiprocessing.Pool(initializer=_initialize_process_environment, initargs=(lock,)) as pool:
+    with multiprocessing.Pool(processes=8, initializer=_initialize_process_environment, initargs=(lock,)) as pool:
         pool.starmap(
             _do_count_calls_and_parameters,
             [[it[1], exclude_file, out_dir, it[0], length] for it in enumerate(python_files)]
@@ -115,14 +115,40 @@ def _merge_results(out_dir: Path) -> None:
             content = json.load(f)
 
         # merge calls
-        calls: CallStore = content["calls"]
-        # for result
+        call_store: CallStore = content["calls"]
+        for callable_name, occurrences in call_store.items():
+            if callable_name not in result_calls:
+                result_calls[callable_name] = []
+
+            result_calls[callable_name].extend(occurrences)
 
         # merge parameters
-        parameters: ParameterStore = content["parameters"]
+        parameter_store: ParameterStore = content["parameters"]
+        for callable_name, parameters in parameter_store.items():
+            if callable_name not in result_parameters:
+                result_parameters[callable_name] = {}
+
+            for parameter_name, occurrences in parameters.items():
+                if parameter_name not in result_parameters[callable_name]:
+                    result_parameters[callable_name][parameter_name] = []
+
+                result_parameters[callable_name][parameter_name].extend(occurrences)
 
         # merge values
-        values: ValueStore = content["values"]
+        value_store: ValueStore = content["values"]
+        for callable_name, parameters in value_store.items():
+            if callable_name not in result_values:
+                result_values[callable_name] = {}
+
+            for parameter_name, values in parameters.items():
+                if parameter_name not in result_values[callable_name]:
+                    result_values[callable_name][parameter_name] = {}
+
+                for stringified_value, occurrences in values.items():
+                    if stringified_value not in result_values[callable_name][parameter_name]:
+                        result_values[callable_name][parameter_name][stringified_value] = []
+
+                    result_values[callable_name][parameter_name][stringified_value].extend(occurrences)
 
     result = {
         "calls": result_calls,
