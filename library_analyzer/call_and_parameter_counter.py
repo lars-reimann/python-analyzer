@@ -162,7 +162,8 @@ class _CallAndParameterCounter:
             }
 
         for parameter_name, value in bound_parameters.items():
-            stringified_value = value.as_string()
+            stringified_value = _stringify_value(value)
+
             if stringified_value not in self.values[qualified_name][parameter_name]:
                 self.values[qualified_name][parameter_name][stringified_value] = []
 
@@ -225,12 +226,12 @@ def _bound_parameters(
     parameters: astroid.Arguments,
     arguments: CallSite,
     n_implicit_parameters: int
-) -> Optional[dict[str, Any]]:
+) -> Optional[dict[str, astroid.NodeNG]]:
     # Improper call
     if parameters.args is None or arguments.has_invalid_arguments() or arguments.has_invalid_keywords():
         return None
 
-    result: dict[str, Any] = arguments.keyword_arguments.copy()
+    result: dict[str, astroid.NodeNG] = arguments.keyword_arguments.copy()
 
     positional_parameter_names = [it.name for it in (parameters.posonlyargs + parameters.args)][n_implicit_parameters:]
 
@@ -245,3 +246,7 @@ def _all_parameter_names(parameters: astroid.Arguments, n_implicit_parameters: i
         it.name
         for it in (parameters.posonlyargs + parameters.args + parameters.kwonlyargs)[n_implicit_parameters:]
     )
+
+
+def _stringify_value(value: astroid.NodeNG):
+    return value.as_string()
