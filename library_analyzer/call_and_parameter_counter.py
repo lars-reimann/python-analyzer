@@ -86,6 +86,8 @@ def do_count_calls_and_parameters(
                 "parameters": call_and_parameter_counter.parameters,
                 "values": call_and_parameter_counter.values
             }, f, indent=4)
+    else:
+        print("Skipping irrelevant file")
 
     with _lock:
         with exclude_file.open("a") as f:
@@ -136,7 +138,7 @@ class _CallAndParameterCounter:
         occurrence: Occurrence = (self.python_file, node.lineno, node.col_offset)
 
         # Count how often each method is called
-        if self.calls[qualified_name] is None:
+        if qualified_name not in self.calls:
             self.calls[qualified_name] = []
         self.calls[qualified_name].append(occurrence)
 
@@ -157,7 +159,7 @@ class _CallAndParameterCounter:
                 for name in _all_parameter_names(parameters, n_implicit_parameters)
             }
 
-        for parameter_name, value in bound_parameters:
+        for parameter_name, value in bound_parameters.items():
             stringified_value = value.as_string()
             if stringified_value not in self.values[qualified_name][parameter_name]:
                 self.values[qualified_name][parameter_name][stringified_value] = []
