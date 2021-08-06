@@ -111,6 +111,9 @@ def _merge_results(out_dir: Path) -> None:
 
     files = list_files(out_dir, ".json")
     for index, file in enumerate(files):
+        if "$$$$$merged" in file:
+            continue  # this is an output of this process
+
         print(f"Merging {file} ({index + 1}/{len(files)})")
 
         with open(file, "r") as f:
@@ -152,14 +155,41 @@ def _merge_results(out_dir: Path) -> None:
 
                     result_values[callable_name][parameter_name][stringified_value].extend(occurrences)
 
-    result = {
+    result_occurrences = {
         "calls": result_calls,
         "parameters": result_parameters,
         "values": result_values
     }
 
-    with out_dir.joinpath("$$$$$merged$$$$$.json").open("w") as f:
-        json.dump(result, f, indent=4)
+    with out_dir.joinpath("$$$$$merged_occurrences$$$$$.json").open("w") as f:
+        json.dump(result_occurrences, f, indent=4)
+
+    result_counts = {
+        "calls": {
+            callable_name: len(occurrences)
+            for callable_name, occurrences in result_calls.items()
+        },
+        "parameters": {
+            callable_name: {
+                parameter_name: len(occurrences)
+                for parameter_name, occurrences in parameters.items()
+            }
+            for callable_name, parameters in result_parameters.items()
+        },
+        "values": {
+            callable_name: {
+                parameter_name: {
+                    stringified_value: len(occurrences)
+                    for stringified_value, occurrences in values.items()
+                }
+                for parameter_name, values in parameters.items()
+            }
+            for callable_name, parameters in result_values.items()
+        }
+    }
+
+    with out_dir.joinpath("$$$$$merged_counts$$$$$.json").open("w") as f:
+        json.dump(result_counts, f, indent=4)
 
 
 def _is_relevant_qualified_name(qualified_name: str) -> bool:
