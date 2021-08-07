@@ -2,7 +2,7 @@ import json
 import multiprocessing
 import sys
 from pathlib import Path
-from typing import Optional, Any, Generator
+from typing import Optional
 
 import astroid
 from astroid.arguments import CallSite
@@ -58,7 +58,7 @@ def count_calls_and_parameters(src_dir: Path, exclude_file: Path, out_dir: Path)
     length = len(python_files)
 
     lock = multiprocessing.Lock()
-    with multiprocessing.Pool(processes=None, initializer=_initialize_process_environment, initargs=(lock,)) as pool:
+    with multiprocessing.Pool(processes=12, initializer=_initialize_process_environment, initargs=(lock,)) as pool:
         pool.starmap(
             _do_count_calls_and_parameters,
             [[it[1], exclude_file, out_dir, it[0], length] for it in enumerate(python_files)]
@@ -289,11 +289,7 @@ class _CallAndParameterCounter:
 
         # Count how often each parameter is used
         if qualified_name not in self.parameters:
-            self.parameters[qualified_name] = {
-                # TODO remove once we do this once globally
-                name: []
-                for name in _all_parameter_names(parameters, n_implicit_parameters)
-            }
+            self.parameters[qualified_name] = {}
 
         for parameter_name in bound_parameters.keys():
             if parameter_name not in self.parameters[qualified_name]:
@@ -302,11 +298,7 @@ class _CallAndParameterCounter:
 
         # Count how often each value is used
         if qualified_name not in self.values:
-            self.values[qualified_name] = {
-                # TODO remove once we do this once globally
-                name: {}
-                for name in _all_parameter_names(parameters, n_implicit_parameters)
-            }
+            self.values[qualified_name] = {}
 
         for parameter_name, value in bound_parameters.items():
             stringified_value = _stringify_value(value)
@@ -392,13 +384,6 @@ def _bound_parameters(
         result[positional_parameter_names[index]] = arg
 
     return result
-
-
-def _all_parameter_names(parameters: astroid.Arguments, n_implicit_parameters: int) -> Generator[str, Any, None]:
-    return (
-        it.name
-        for it in (parameters.posonlyargs + parameters.args + parameters.kwonlyargs)[n_implicit_parameters:]
-    )
 
 
 def _stringify_value(value: astroid.NodeNG):

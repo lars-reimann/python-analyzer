@@ -1,13 +1,16 @@
 import importlib
-import json
 from pathlib import Path
+from typing import Optional
 
 import astroid
 
 from utils import list_files, ASTWalker
 
+# Type aliases
+CallableStore = dict[str, dict[str, Optional[str]]]
 
-def list_all_callables(package_name: str):
+
+def list_all_callables(package_name: str) -> CallableStore:
     root = _package_root(package_name)
     files = list_files(root, ".py")
 
@@ -18,7 +21,7 @@ def list_all_callables(package_name: str):
             source = f.read()
             ASTWalker(callable_visitor).walk(astroid.parse(source))
 
-    print(len(callable_visitor.callables.keys()))
+    return callable_visitor.callables
 
 
 def _package_root(package_name: str) -> Path:
@@ -34,7 +37,7 @@ def _qname_root(root: Path, file: Path) -> str:
 class _CallableVisitor:
     def __init__(self) -> None:
         self.qname_root: str = ""
-        self.callables: dict[str, dict[str, str]] = {}
+        self.callables: CallableStore = {}
 
     def visit_functiondef(self, node: astroid.FunctionDef) -> None:
         qname = f"{self.qname_root}{node.qname()}"
@@ -43,7 +46,49 @@ class _CallableVisitor:
             print(f"Working on function {qname}")
 
             if qname not in self.callables:
-                self.callables[qname] = {}
+                self.callables[qname] = self._function_parameters(node)
+
+    @staticmethod
+    def _function_parameters(node: astroid.FunctionDef) -> dict[str, Optional[str]]:
+        parameters: astroid.Arguments = node.args
+        n_implicit_parameters = node.implicit_parameters()
+
+        result = [(it.name, None) for it in parameters.posonlyargs]
+        result += [
+            (
+                it.name,
+                _CallableVisitor._parameter_default(
+                    parameters.defaults,
+                    index - len(parameters.args) + len(parameters.defaults)
+                )
+            )
+            for index, it in enumerate(parameters.args)
+        ]
+        result += [
+            (
+                it.name,
+                _CallableVisitor._parameter_default(
+                    parameters.kw_defaults,
+                    index - len(parameters.kwonlyargs) + len(parameters.kw_defaults)
+                )
+            )
+            for index, it in enumerate(parameters.kwonlyargs)
+        ]
+
+        return {
+            name: default
+            for name, default in result[n_implicit_parameters:]
+        }
+
+    @staticmethod
+    def _parameter_default(defaults: list[astroid.NodeNG], default_index: int) -> Optional[str]:
+        if 0 <= default_index < len(defaults):
+            default = defaults[default_index]
+            if default is None:
+                return None
+            return default.as_string()
+        else:
+            return None
 
     @staticmethod
     def is_relevant(name: str, qname: str) -> bool:
