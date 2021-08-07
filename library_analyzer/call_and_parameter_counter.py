@@ -203,10 +203,11 @@ def _merge_results(out_dir: Path) -> tuple[CallStore, ParameterStore, ValueStore
 
 def _aggregate_results(out_dir: Path, result_calls: CallStore, result_parameters: ParameterStore,
                        result_values: ValueStore):
-    _count(out_dir, result_calls, result_values)
+    call_counts, parameter_counts = _count(out_dir, result_calls, result_values)
+    _count_distribution(out_dir, call_counts, parameter_counts)
 
 
-def _count(out_dir: Path, result_calls: CallStore, result_values: ValueStore):
+def _count(out_dir: Path, result_calls: CallStore, result_values: ValueStore) -> tuple[Any, Any]:
     call_counts = {
         callable_name: len(occurrences)
         for callable_name, occurrences in result_calls.items()
@@ -274,6 +275,46 @@ def _count(out_dir: Path, result_calls: CallStore, result_values: ValueStore):
 
     with out_dir.joinpath("$$$$$merged_counts_compact$$$$$.json").open("w") as f:
         json.dump(result_counts_compacts, f, indent=4)
+
+    return call_counts, parameter_counts
+
+
+def _count_distribution(out_dir: Path, call_counts: Any, parameter_counts: Any):
+    flat_call_counts = list(call_counts.values())
+    max_call_count = max(flat_call_counts)
+
+    # count functions that are used at most i times
+    called_at_most = []
+    for i in range(max_call_count + 1):
+        called_at_most_i_times = len([count for count in flat_call_counts if count <= i])
+        called_at_most.append(called_at_most_i_times)
+
+    with out_dir.joinpath("$$$$$merged_called_at_most_index_times$$$$$.json").open("w") as f:
+        json.dump(
+            [{"maxCalls": index, "functionCount": count} for index, count in enumerate(called_at_most)],
+            f,
+            indent=4
+        )
+
+    flat_parameter_counts = [
+        count
+
+        for parameters in parameter_counts.values()
+        for count in parameters.values()
+    ]
+    max_parameter_count = max(flat_parameter_counts)
+
+    parameter_used_at_most = []
+    for i in range(max_parameter_count + 1):
+        parameter_used_at_most_i_times = len([count for count in flat_parameter_counts if count <= i])
+        parameter_used_at_most.append(parameter_used_at_most_i_times)
+
+    with out_dir.joinpath("$$$$$merged_parameter_used_at_most_index_times$$$$$.json").open("w") as f:
+        json.dump(
+            [{"maxUsages": index, "parameterCount": count} for index, count in enumerate(parameter_used_at_most)],
+            f,
+            indent=4
+        )
 
 
 def _is_relevant_qualified_name(qualified_name: str) -> bool:
