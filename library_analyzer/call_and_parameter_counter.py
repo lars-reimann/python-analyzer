@@ -10,7 +10,20 @@ from astroid.helpers import safe_infer
 
 from .utils import ASTWalker, list_files, initialize_and_read_exclude_file
 
-relevant_prefixes = {
+# Type aliases
+CallableName = str
+ParameterName = str
+StringifiedValue = str
+FileName = str
+LineNumber = int
+ColumnNumber = int
+Occurrence = tuple[FileName, Optional[LineNumber], Optional[ColumnNumber]]
+CallStore = dict[CallableName, list[Occurrence]]
+ParameterStore = dict[CallableName, dict[ParameterName, list[Occurrence]]]
+ValueStore = dict[CallableName, dict[ParameterName, dict[StringifiedValue, list[Occurrence]]]]
+
+# Global values
+_relevant_prefixes = {
     # "bokeh",
     # "catboost",
     # "cntk",
@@ -52,7 +65,8 @@ def count_calls_and_parameters(src_dir: Path, exclude_file: Path, out_dir: Path)
         )
     pool.join()
 
-    _merge_results(out_dir)
+    (result_calls, result_parameters, result_values) = _merge_results(out_dir)
+    _aggregate_results(out_dir, result_calls, result_parameters, result_values)
 
 
 def _initialize_process_environment(lock: multiprocessing.Lock):
@@ -104,7 +118,7 @@ def _do_count_calls_and_parameters(
             f.write(f"{python_file}\n")
 
 
-def _merge_results(out_dir: Path) -> None:
+def _merge_results(out_dir: Path) -> tuple[CallStore, ParameterStore, ValueStore]:
     result_calls: CallStore = {}
     result_parameters: ParameterStore = {}
     result_values: ValueStore = {}
@@ -164,6 +178,16 @@ def _merge_results(out_dir: Path) -> None:
     with out_dir.joinpath("$$$$$merged_occurrences$$$$$.json").open("w") as f:
         json.dump(result_occurrences, f, indent=4)
 
+    return result_calls, result_parameters, result_values
+
+
+def _aggregate_results(out_dir: Path, result_calls: CallStore, result_parameters: ParameterStore,
+                       result_values: ValueStore):
+    _count(out_dir, result_calls, result_parameters, result_values)
+    _count_compact(out_dir, result_calls, result_parameters, result_values)
+
+
+def _count(out_dir: Path, result_calls: CallStore, result_parameters: ParameterStore, result_values: ValueStore):
     result_counts = {
         "calls": {
             callable_name: len(occurrences)
@@ -191,6 +215,9 @@ def _merge_results(out_dir: Path) -> None:
     with out_dir.joinpath("$$$$$merged_counts$$$$$.json").open("w") as f:
         json.dump(result_counts, f, indent=4)
 
+
+def _count_compact(out_dir: Path, result_calls: CallStore, result_parameters: ParameterStore,
+                   result_values: ValueStore):
     result_counts_compacts = {
         callable_name: {
             "count": len(result_calls[callable_name]),
@@ -225,23 +252,11 @@ def _merge_results(out_dir: Path) -> None:
 
 
 def _is_relevant_qualified_name(qualified_name: str) -> bool:
-    return any(qualified_name.startswith(prefix) for prefix in relevant_prefixes)
+    return any(qualified_name.startswith(prefix) for prefix in _relevant_prefixes)
 
 
 def _is_relevant_python_file(source: str) -> bool:
-    return any(prefix in source for prefix in relevant_prefixes)
-
-
-CallableName = str
-ParameterName = str
-StringifiedValue = str
-FileName = str
-LineNumber = int
-ColumnNumber = int
-Occurrence = tuple[FileName, Optional[LineNumber], Optional[ColumnNumber]]
-CallStore = dict[CallableName, list[Occurrence]]
-ParameterStore = dict[CallableName, dict[ParameterName, list[Occurrence]]]
-ValueStore = dict[CallableName, dict[ParameterName, dict[StringifiedValue, list[Occurrence]]]]
+    return any(prefix in source for prefix in _relevant_prefixes)
 
 
 class _CallAndParameterCounter:
@@ -275,6 +290,7 @@ class _CallAndParameterCounter:
         # Count how often each parameter is used
         if qualified_name not in self.parameters:
             self.parameters[qualified_name] = {
+                # TODO remove once we do this once globally
                 name: []
                 for name in _all_parameter_names(parameters, n_implicit_parameters)
             }
@@ -287,6 +303,7 @@ class _CallAndParameterCounter:
         # Count how often each value is used
         if qualified_name not in self.values:
             self.values[qualified_name] = {
+                # TODO remove once we do this once globally
                 name: {}
                 for name in _all_parameter_names(parameters, n_implicit_parameters)
             }
