@@ -2,12 +2,13 @@ import json
 import multiprocessing
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Any
 
 import astroid
 from astroid.arguments import CallSite
 from astroid.helpers import safe_infer
 
+from .all_callables_in_library import list_all_callables
 from .utils import ASTWalker, list_files, initialize_and_read_exclude_file
 
 # Type aliases
@@ -20,10 +21,10 @@ ColumnNumber = int
 Occurrence = tuple[FileName, Optional[LineNumber], Optional[ColumnNumber]]
 CallStore = dict[CallableName, list[Occurrence]]
 ParameterStore = dict[CallableName, dict[ParameterName, list[Occurrence]]]
-ValueStore = dict[CallableName, dict[ParameterName, dict[StringifiedValue, list[Occurrence]]]]
+ValueStore = dict[CallableName, dict[ParameterName, dict[str, Any]]]
 
 # Global values
-_relevant_prefixes = {
+_relevant_packages = {
     # "bokeh",
     # "catboost",
     # "cntk",
@@ -66,7 +67,7 @@ def count_calls_and_parameters(src_dir: Path, exclude_file: Path, out_dir: Path)
     pool.join()
 
     (result_calls, result_parameters, result_values) = _merge_results(out_dir)
-    _aggregate_results(out_dir, result_calls, result_parameters, result_values)
+    # _aggregate_results(out_dir, result_calls, result_parameters, result_values)
 
 
 def _initialize_process_environment(lock: multiprocessing.Lock):
@@ -123,6 +124,22 @@ def _merge_results(out_dir: Path) -> tuple[CallStore, ParameterStore, ValueStore
     result_parameters: ParameterStore = {}
     result_values: ValueStore = {}
 
+    # Include all callables and parameters (and their default values) from relevant packages
+    for package_name in _relevant_packages:
+        callables = list_all_callables(package_name)
+
+        for callable_name, parameters in callables.items():
+            result_calls[callable_name] = []
+            result_parameters[callable_name] = {}
+            result_values[callable_name] = {}
+
+            for parameter_name, default_value in parameters.items():
+                result_parameters[callable_name][parameter_name] = []
+                result_values[callable_name][parameter_name] = {
+                    "defaultValue": default_value,
+                    "values": {}
+                }
+
     files = list_files(out_dir, ".json")
     for index, file in enumerate(files):
         if "$$$$$merged" in file:
@@ -161,13 +178,16 @@ def _merge_results(out_dir: Path) -> tuple[CallStore, ParameterStore, ValueStore
 
             for parameter_name, values in parameters.items():
                 if parameter_name not in result_values[callable_name]:
-                    result_values[callable_name][parameter_name] = {}
+                    result_values[callable_name][parameter_name] = {
+                        "defaultValue": None,
+                        "values": {}
+                    }
 
                 for stringified_value, occurrences in values.items():
-                    if stringified_value not in result_values[callable_name][parameter_name]:
-                        result_values[callable_name][parameter_name][stringified_value] = []
+                    if stringified_value not in result_values[callable_name][parameter_name]["values"]:
+                        result_values[callable_name][parameter_name]["values"][stringified_value] = []
 
-                    result_values[callable_name][parameter_name][stringified_value].extend(occurrences)
+                    result_values[callable_name][parameter_name]["values"][stringified_value].extend(occurrences)
 
     result_occurrences = {
         "calls": result_calls,
@@ -252,11 +272,11 @@ def _count_compact(out_dir: Path, result_calls: CallStore, result_parameters: Pa
 
 
 def _is_relevant_qualified_name(qualified_name: str) -> bool:
-    return any(qualified_name.startswith(prefix) for prefix in _relevant_prefixes)
+    return any(qualified_name.startswith(prefix) for prefix in _relevant_packages)
 
 
 def _is_relevant_python_file(source: str) -> bool:
-    return any(prefix in source for prefix in _relevant_prefixes)
+    return any(prefix in source for prefix in _relevant_packages)
 
 
 class _CallAndParameterCounter:

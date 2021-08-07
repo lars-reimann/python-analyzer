@@ -4,7 +4,7 @@ from typing import Optional
 
 import astroid
 
-from utils import list_files, ASTWalker
+from .utils import list_files, ASTWalker
 
 # Type aliases
 CallableStore = dict[str, dict[str, Optional[str]]]
@@ -96,7 +96,3 @@ class _CallableVisitor:
             return False
 
         return not name.startswith("_") or name.startswith("__")
-
-
-if __name__ == '__main__':
-    list_all_callables("sklearn")
