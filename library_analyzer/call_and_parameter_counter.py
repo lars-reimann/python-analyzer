@@ -67,7 +67,7 @@ def count_calls_and_parameters(src_dir: Path, exclude_file: Path, out_dir: Path)
     pool.join()
 
     (result_calls, result_parameters, result_values) = _merge_results(out_dir)
-    # _aggregate_results(out_dir, result_calls, result_parameters, result_values)
+    _aggregate_results(out_dir, result_calls, result_parameters, result_values)
 
 
 def _initialize_process_environment(lock: multiprocessing.Lock):
@@ -203,66 +203,71 @@ def _merge_results(out_dir: Path) -> tuple[CallStore, ParameterStore, ValueStore
 
 def _aggregate_results(out_dir: Path, result_calls: CallStore, result_parameters: ParameterStore,
                        result_values: ValueStore):
-    _count(out_dir, result_calls, result_parameters, result_values)
-    _count_compact(out_dir, result_calls, result_parameters, result_values)
+    _count(out_dir, result_calls, result_values)
 
 
-def _count(out_dir: Path, result_calls: CallStore, result_parameters: ParameterStore, result_values: ValueStore):
-    result_counts = {
-        "calls": {
-            callable_name: len(occurrences)
-            for callable_name, occurrences in result_calls.items()
-        },
-        "parameters": {
-            callable_name: {
-                parameter_name: len(occurrences)
-                for parameter_name, occurrences in parameters.items()
+def _count(out_dir: Path, result_calls: CallStore, result_values: ValueStore):
+    call_counts = {
+        callable_name: len(occurrences)
+        for callable_name, occurrences in result_calls.items()
+    }
+
+    value_counts = {
+        callable_name: {
+            parameter_name: {
+                stringified_value: len(occurrences)
+                for stringified_value, occurrences in parameter_data["values"].items()
+                # filter cases where the set value is the default value
+                if stringified_value != parameter_data["defaultValue"]
             }
-            for callable_name, parameters in result_parameters.items()
-        },
-        "values": {
-            callable_name: {
-                parameter_name: {
-                    stringified_value: len(occurrences)
-                    for stringified_value, occurrences in values.items()
-                }
-                for parameter_name, values in parameters.items()
-            }
-            for callable_name, parameters in result_values.items()
+            for parameter_name, parameter_data in parameters.items()
         }
+        for callable_name, parameters in result_values.items()
+    }
+
+    parameter_counts = {
+        callable_name: {
+            # we use this so this value also does not include the cases where they pass the default value explicitly
+            parameter_name: sum(values.values())
+            for parameter_name, values in parameters.items()
+        }
+        for callable_name, parameters in value_counts.items()
+    }
+
+    result_counts = {
+        "calls": call_counts,
+        "parameters": parameter_counts,
+        "values": value_counts
     }
 
     with out_dir.joinpath("$$$$$merged_counts$$$$$.json").open("w") as f:
         json.dump(result_counts, f, indent=4)
 
-
-def _count_compact(out_dir: Path, result_calls: CallStore, result_parameters: ParameterStore,
-                   result_values: ValueStore):
     result_counts_compacts = {
         callable_name: {
-            "count": len(result_calls[callable_name]),
+            "count": call_counts[callable_name],
             "parameters": {
                 parameter_name: {
-                    "count": len(result_parameters[callable_name][parameter_name]),
+                    "count": parameter_counts[callable_name][parameter_name],
                     "values": {
-                        stringified_value: len(occurrences)
-                        for stringified_value, occurrences in sorted(
+                        stringified_value: value_count
+                        for stringified_value, value_count in sorted(
                             values.items(),
-                            key=lambda it: len(it[1]),
+                            key=lambda it: it[1],
                             reverse=True
                         )
                     }
                 }
                 for parameter_name, values in sorted(
                     parameters.items(),
-                    key=lambda it: len(result_parameters[callable_name][it[0]]),
+                    key=lambda it: parameter_counts[callable_name][it[0]],
                     reverse=True
                 )
             }
         }
         for callable_name, parameters in sorted(
-            result_values.items(),
-            key=lambda it: len(result_calls[it[0]]),
+            value_counts.items(),
+            key=lambda it: call_counts[it[0]],
             reverse=True
         )
     }
