@@ -78,6 +78,7 @@ class _CallableVisitor:
         return {
             name: default
             for name, default in result[n_implicit_parameters:]
+            if name != "self"
         }
 
     @staticmethod
