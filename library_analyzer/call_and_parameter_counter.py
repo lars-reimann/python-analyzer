@@ -90,14 +90,14 @@ def _do_count_calls_and_parameters(
                     "values": call_and_parameter_counter.values
                 }, f, indent=4)
         else:
-            print("Skipping (irrelevant file)")
+            print(f"Skipping {python_file} (irrelevant file)")
 
     except UnicodeError:
-        print("Skipping (broken encoding)")
+        print(f"Skipping {python_file} (broken encoding)")
     except astroid.exceptions.AstroidSyntaxError:
-        print("Skipping (invalid syntax)")
+        print(f"Skipping {python_file} (invalid syntax)")
     except RecursionError:
-        print("Skipping (infinite recursion)")
+        print(f"Skipping {python_file} (infinite recursion)")
 
     with _lock:
         with exclude_file.open("a") as f:
