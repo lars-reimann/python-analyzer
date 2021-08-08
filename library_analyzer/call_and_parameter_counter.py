@@ -203,41 +203,53 @@ def _merge_results(out_dir: Path) -> tuple[CallStore, ParameterStore, ValueStore
 
 def _aggregate_results(out_dir: Path, result_calls: CallStore, result_parameters: ParameterStore,
                        result_values: ValueStore):
-    call_counts, parameter_counts = _count(out_dir, result_calls, result_values)
-    _count_distribution(out_dir, call_counts, parameter_counts)
+    call_counts, parameter_counts, value_counts = _count(out_dir, result_calls, result_parameters, result_values)
+    _count_distribution(out_dir, call_counts, value_counts)
 
 
-def _count(out_dir: Path, result_calls: CallStore, result_values: ValueStore) -> tuple[Any, Any]:
+def _count(
+    out_dir: Path,
+    result_calls: CallStore,
+    result_parameters: ParameterStore,
+    result_values: ValueStore
+) -> tuple[Any, Any, Any]:
     call_counts = {
         callable_name: len(occurrences)
         for callable_name, occurrences in result_calls.items()
     }
 
+    parameter_counts = {
+        callable_name: {
+            # how often a parameter is set explicitly
+            parameter_name: len(occurrences)
+            for parameter_name, occurrences in parameters.items()
+        }
+        for callable_name, parameters in result_parameters.items()
+    }
+
     value_counts = {
         callable_name: {
             parameter_name: {
-                stringified_value: len(occurrences)
+                stringified_value:
+                    len(occurrences)
+                    if stringified_value != parameter_data["defaultValue"]
+                    # how often the default value is used (explicitly or implicitly)
+                    else call_counts[callable_name] - sum(
+                        [
+                            len(occurrences)
+                            for inner_stringified_value, occurrences in parameter_data["values"].items()
+                            if inner_stringified_value != parameter_data["defaultValue"]
+                        ]
+                    )
                 for stringified_value, occurrences in parameter_data["values"].items()
-                # filter cases where the set value is the default value
-                if stringified_value != parameter_data["defaultValue"]
             }
             for parameter_name, parameter_data in parameters.items()
         }
         for callable_name, parameters in result_values.items()
     }
 
-    parameter_counts = {
-        callable_name: {
-            # we use this so this value also does not include the cases where they pass the default value explicitly
-            parameter_name: sum(values.values())
-            for parameter_name, values in parameters.items()
-        }
-        for callable_name, parameters in value_counts.items()
-    }
-
     result_counts = {
         "calls": call_counts,
-        "parameters": parameter_counts,
         "values": value_counts
     }
 
@@ -249,7 +261,6 @@ def _count(out_dir: Path, result_calls: CallStore, result_values: ValueStore) ->
             "count": call_counts[callable_name],
             "parameters": {
                 parameter_name: {
-                    "count": parameter_counts[callable_name][parameter_name],
                     "values": {
                         stringified_value: value_count
                         for stringified_value, value_count in sorted(
@@ -276,31 +287,66 @@ def _count(out_dir: Path, result_calls: CallStore, result_values: ValueStore) ->
     with out_dir.joinpath("$$$$$merged_counts_compact$$$$$.json").open("w") as f:
         json.dump(result_counts_compacts, f, indent=4)
 
-    return call_counts, parameter_counts
+    return call_counts, parameter_counts, value_counts
 
 
-def _count_distribution(out_dir: Path, call_counts: Any, parameter_counts: Any):
-    flat_call_counts = list(call_counts.values())
-    max_call_count = max(flat_call_counts)
+def _count_distribution(out_dir: Path, call_counts: Any, value_counts: Any):
+    # count classes that are used at most i times
+    flat_class_instantiation_counts = [
+        count
+        for callable_name, count in call_counts.items()
+        if callable_name.endswith("__init__")
+    ]
+    max_instantiation_count = max(flat_class_instantiation_counts)
 
-    # count functions that are used at most i times
-    called_at_most = []
-    for i in range(max_call_count + 1):
-        called_at_most_i_times = len([count for count in flat_call_counts if count <= i])
-        called_at_most.append(called_at_most_i_times)
+    class_instantiated_at_most = []
+    for i in range(max_instantiation_count + 1):
+        class_instantiated_at_most_i_times = len([count for count in flat_class_instantiation_counts if count <= i])
+        class_instantiated_at_most.append(class_instantiated_at_most_i_times)
 
-    with out_dir.joinpath("$$$$$merged_called_at_most_index_times$$$$$.json").open("w") as f:
+    with out_dir.joinpath("$$$$$merged_class_instantiated_at_most_index_times$$$$$.json").open("w") as f:
         json.dump(
-            [{"maxCalls": index, "functionCount": count} for index, count in enumerate(called_at_most)],
+            [
+                {"maxInstantiation": index, "classCount": count}
+                for index, count in enumerate(class_instantiated_at_most)
+            ],
             f,
             indent=4
         )
 
-    flat_parameter_counts = [
+    # count functions that are used at most i times
+    flat_function_call_counts = [
         count
+        for callable_name, count in call_counts.items()
+        if not callable_name.endswith("__init__")
+    ]
+    max_function_call_count = max(flat_function_call_counts)
 
-        for parameters in parameter_counts.values()
-        for count in parameters.values()
+    function_called_at_most = []
+    for i in range(max_function_call_count + 1):
+        function_called_at_most_i_times = len([count for count in flat_function_call_counts if count <= i])
+        function_called_at_most.append(function_called_at_most_i_times)
+
+    with out_dir.joinpath("$$$$$merged_function_called_at_most_index_times$$$$$.json").open("w") as f:
+        json.dump(
+            [
+                {"maxCalls": index, "functionCount": count}
+                for index, count in enumerate(function_called_at_most)
+            ],
+            f,
+            indent=4
+        )
+
+    # count parameters where the most commonly used value is used in all but i cases
+    flat_parameter_counts = [
+        call_counts[callable_name] - max([count for count in parameters[parameter_name].values()],
+                                         default=call_counts[callable_name])
+        # otherwise the parameter is set but does not even exist
+        if sum([count for count in parameters[parameter_name].values()]) == call_counts[callable_name]
+        else sum([count for count in parameters[parameter_name].values()])
+
+        for callable_name, parameters in value_counts.items()
+        for parameter_name in parameters.keys()
     ]
     max_parameter_count = max(flat_parameter_counts)
 
