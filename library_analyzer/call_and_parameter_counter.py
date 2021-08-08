@@ -205,6 +205,7 @@ def _aggregate_results(out_dir: Path, result_calls: CallStore, result_parameters
                        result_values: ValueStore):
     call_counts, parameter_counts, value_counts = _count(out_dir, result_calls, result_parameters, result_values)
     _count_distribution(out_dir, call_counts, value_counts)
+    _affected_occurrences(out_dir, result_calls, result_values, call_counts, value_counts)
 
 
 def _count(
@@ -361,6 +362,109 @@ def _count_distribution(out_dir: Path, call_counts: Any, value_counts: Any):
             f,
             indent=4
         )
+
+
+def _affected_occurrences(
+    out_dir: Path,
+    result_calls: CallStore,
+    result_values: ValueStore,
+    call_counts: Any,
+    value_counts: Any
+) -> None:
+    result = []
+
+    for callable_call_cutoff in range(0, 101):
+        for parameter_usage_cutoff in range(callable_call_cutoff, 101):
+            removed_callables = _callables_called_at_most_n_times(call_counts, callable_call_cutoff)
+            removed_parameters = _parameters_used_at_most_n_times(call_counts, value_counts, parameter_usage_cutoff)
+            n_affected_files = _n_affected_files(result_calls, result_values, removed_callables, removed_parameters)
+            result.append({
+                "callCutoff": callable_call_cutoff,
+                "parameterUsageCutoff": parameter_usage_cutoff,
+                "affectedPrograms": n_affected_files
+            })
+
+    with out_dir.joinpath("$$$$$merged_affected_occurrences$$$$$.json").open("w") as f:
+        json.dump(result, f, indent=4)
+
+
+def _callables_called_at_most_n_times(call_counts: Any, n: int) -> list[CallableName]:
+    return [
+        callable_name
+        for callable_name, count in call_counts.items()
+        if count <= n
+    ]
+
+
+def _parameters_used_at_most_n_times(
+    call_counts: Any,
+    value_counts: Any,
+    n: int
+) -> list[tuple[CallableName, ParameterName, list[StringifiedValue]]]:
+    return [
+        (callable_name, parameter_name, [
+            stringified_value
+            for stringified_value in values.keys()
+            if stringified_value != _most_common_value(value_counts, callable_name, parameter_name)[0]
+        ])
+
+        for callable_name, parameters in value_counts.items()
+        for parameter_name, values in parameters.items()
+
+        if _n_parameter_uses(call_counts, value_counts, callable_name, parameter_name) <= n
+    ]
+
+
+def _most_common_value(
+    value_counts: Any,
+    callable_name: str,
+    parameter_name: str
+) -> tuple[Optional[StringifiedValue], int]:
+    values = value_counts[callable_name][parameter_name].items()
+
+    result = None, 0
+    for stringified_value, count in values:
+        if count > result[1]:
+            result = stringified_value, count
+
+    return result
+
+
+def _n_parameter_uses(call_counts: Any, value_counts: Any, callable_name: str, parameter_name: str) -> int:
+    n_calls = call_counts[callable_name]
+    n_parameters_set = sum(count for count in value_counts[callable_name][parameter_name].values())
+
+    if n_calls == n_parameters_set:  # sum of counts how often each value is used should equal the number of calls
+        most_common_value, count = _most_common_value(value_counts, callable_name, parameter_name)
+        if most_common_value is None:
+            return 0
+
+        return n_calls - count
+
+    else:  # otherwise the parameter is set but does not even exist
+        return n_parameters_set
+
+
+def _n_affected_files(
+    result_calls: CallStore,
+    result_values: ValueStore,
+    removed_callables: list[CallableName],
+    removed_parameters: list[tuple[CallableName, ParameterName, list[StringifiedValue]]]
+) -> int:
+    affected_files = set()
+
+    for callable_name in removed_callables:
+        for occurrence in result_calls[callable_name]:
+            affected_files.add(occurrence[0])
+
+    for callable_name, parameter_name, stringified_values in removed_parameters:
+        for stringified_value in stringified_values:
+            # if the stringified value is not listed then it's never used explicitly (can only happen when
+            # another value is used more often than the default)
+            for occurrence in (result_values[callable_name][parameter_name].get(stringified_value) or []):
+                affected_files.add(occurrence[0])
+
+    return len(affected_files)
 
 
 def _is_relevant_qualified_name(qualified_name: str) -> bool:
