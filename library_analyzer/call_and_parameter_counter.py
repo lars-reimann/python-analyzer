@@ -461,7 +461,7 @@ def _n_affected_files(
         for stringified_value in stringified_values:
             # if the stringified value is not listed then it's never used explicitly (can only happen when
             # another value is used more often than the default)
-            for occurrence in (result_values[callable_name][parameter_name].get(stringified_value) or []):
+            for occurrence in (result_values[callable_name][parameter_name]["values"].get(stringified_value) or []):
                 affected_files.add(occurrence[0])
 
     return len(affected_files)
