@@ -147,7 +147,7 @@ class _CallableVisitor:
             return None
 
     def is_public(self, name: str, qualified_name: str) -> bool:
-        if name.startswith("_") and not name.startswith("__"):
+        if name.startswith("_") and not name.endswith("__"):
             return False
 
         if qualified_name in self.reexported:
