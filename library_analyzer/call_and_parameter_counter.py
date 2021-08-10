@@ -231,19 +231,7 @@ def _removed_classes(out_dir: Path, class_store: ClassStore):
             used_public_classes.add(class_name)
     unused_public_classes = all_public_classes.difference(used_public_classes)
 
-    relevant_public_classes: set[str] = set()
-    for class_name in class_store.keys():
-        if is_relevant(class_name):
-            relevant_public_classes.add(class_name)
-    irrelevant_public_classes = all_public_classes.difference(relevant_public_classes)
-
-    used_irrelevant_public_classes = irrelevant_public_classes.difference(unused_public_classes)
-
-    removed_public_classes = unused_public_classes.union(irrelevant_public_classes)
-
-    removed_relevant_public_classes = removed_public_classes.difference(irrelevant_public_classes)
-
-    with out_dir.joinpath("$$$$$merged_removed_classes$$$$$.json").open("w") as f:
+    with out_dir.joinpath("$$$$$merged_class_analysis$$$$$.json").open("w") as f:
         json.dump(
             {
                 "all_public_classes": sorted(all_public_classes),
@@ -254,40 +242,10 @@ def _removed_classes(out_dir: Path, class_store: ClassStore):
 
                 "unused_public_classes": sorted(unused_public_classes),
                 "number_of_unused_public_classes": len(unused_public_classes),
-
-                "relevant_public_classes": sorted(relevant_public_classes),
-                "number_of_relevant_public_classes": len(relevant_public_classes),
-
-                "irrelevant_public_classes": sorted(irrelevant_public_classes),
-                "number_of_irrelevant_public_classes": len(irrelevant_public_classes),
-
-                "used_irrelevant_public_classes": sorted(used_irrelevant_public_classes),
-                "number_of_used_irrelevant_public_classes": len(used_irrelevant_public_classes),
-
-                "removed_public_classes": sorted(removed_public_classes),
-                "number_of_removed_public_classes": len(removed_public_classes),
-
-                "removed_relevant_public_classes": sorted(removed_relevant_public_classes),
-                "number_of_removed_relevant_public_classes": len(removed_relevant_public_classes)
             },
             f,
             indent=4
         )
-
-
-def is_relevant(qname: str) -> bool:
-    return all(it not in qname for it in [
-
-        # Testing
-        "._mocking.",
-        "._testing.",
-        ".tests.",
-
-        # Other
-        "sklearn.exceptions.",
-        "sklearn.externals.",
-        "sklearn.utils."
-    ])
 
 
 def _count(

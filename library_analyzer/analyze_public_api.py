@@ -4,7 +4,7 @@ from typing import Optional
 
 import astroid
 
-from utils import list_files, ASTWalker
+from .utils import list_files, ASTWalker
 
 # Type aliases
 CallableStore = dict[str, dict[str, Optional[str]]]
@@ -25,8 +25,6 @@ def get_public_api(package_name: str) -> tuple[CallableStore, set[str]]:
             print("Skipping test file.")
             continue
 
-        # TODO just use the qualified name; now that we passed in the module name it should work
-        callable_visitor.qname_root = _module_name(root, Path(file))
         with open(file, "r") as f:
             source = f.read()
             walker.walk(
@@ -58,10 +56,8 @@ def _init_files_first(files: list[str]) -> list[str]:
     return init_files + other_files
 
 
-
 def _is_test_file(posix_path: str) -> bool:
     return "/test/" in posix_path or "/tests/" in posix_path
-
 
 
 def _module_name(root: Path, file: Path) -> str:
@@ -72,7 +68,6 @@ def _module_name(root: Path, file: Path) -> str:
 class _CallableVisitor:
     def __init__(self) -> None:
         self.reexported: set[str] = set()
-        self.qname_root: str = ""
         self.callables: CallableStore = {}
         self.classes: set[str] = set()
 
@@ -96,13 +91,13 @@ class _CallableVisitor:
                         self.reexported.add(reexported_name)
 
     def visit_classdef(self, node: astroid.ClassDef) -> None:
-        qname = f"{self.qname_root}{node.qname()}"
+        qname = node.qname()
 
         if self.is_public(node.name, qname):
             self.classes.add(qname)
 
     def visit_functiondef(self, node: astroid.FunctionDef) -> None:
-        qname = f"{self.qname_root}{node.qname()}"
+        qname = node.qname()
 
         if self.is_public(node.name, qname):
             if qname not in self.callables:
