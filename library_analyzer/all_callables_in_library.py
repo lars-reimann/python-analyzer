@@ -10,7 +10,7 @@ from .utils import list_files, ASTWalker
 CallableStore = dict[str, dict[str, Optional[str]]]
 
 
-def list_all_callables(package_name: str) -> CallableStore:
+def list_all_callables(package_name: str) -> tuple[CallableStore, set[str]]:
     root = _package_root(package_name)
     files = list_files(root, ".py")
 
@@ -21,7 +21,7 @@ def list_all_callables(package_name: str) -> CallableStore:
             source = f.read()
             ASTWalker(callable_visitor).walk(astroid.parse(source))
 
-    return callable_visitor.callables
+    return callable_visitor.callables, callable_visitor.classes
 
 
 def _package_root(package_name: str) -> Path:
@@ -38,11 +38,20 @@ class _CallableVisitor:
     def __init__(self) -> None:
         self.qname_root: str = ""
         self.callables: CallableStore = {}
+        self.classes: set[str] = set()
+
+    def visit_classdef(self, node: astroid.ClassDef) -> None:
+        qname = f"{self.qname_root}{node.qname()}"
+
+        if _CallableVisitor.is_relevant(node.name, qname):
+            print(f"Working on class {qname}")
+
+            self.classes.add(qname)
 
     def visit_functiondef(self, node: astroid.FunctionDef) -> None:
         qname = f"{self.qname_root}{node.qname()}"
 
-        if self.is_relevant(node.name, qname):
+        if _CallableVisitor.is_relevant(node.name, qname):
             print(f"Working on function {qname}")
 
             if qname not in self.callables:
@@ -93,7 +102,11 @@ class _CallableVisitor:
 
     @staticmethod
     def is_relevant(name: str, qname: str) -> bool:
-        if any(it in qname for it in ["._mocking.", "._testing.", ".tests."]):
-            return False
+        qualified_name_parts = qname.split(".")
 
         return not name.startswith("_") or name.startswith("__")
+
+    def publicly_reexported(qname: str) -> bool:
+        return qname in {
+            "sklearn._loss.glm_distribution."
+        }

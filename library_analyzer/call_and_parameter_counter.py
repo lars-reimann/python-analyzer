@@ -12,6 +12,7 @@ from .all_callables_in_library import list_all_callables
 from .utils import ASTWalker, list_files, initialize_and_read_exclude_file
 
 # Type aliases
+ClassName = str
 CallableName = str
 ParameterName = str
 StringifiedValue = str
@@ -19,6 +20,7 @@ FileName = str
 LineNumber = int
 ColumnNumber = int
 Occurrence = tuple[FileName, Optional[LineNumber], Optional[ColumnNumber]]
+ClassStore = dict[ClassName, list[Occurrence]]
 CallStore = dict[CallableName, list[Occurrence]]
 ParameterStore = dict[CallableName, dict[ParameterName, list[Occurrence]]]
 ValueStore = dict[CallableName, dict[ParameterName, dict[str, Any]]]
@@ -66,8 +68,9 @@ def count_calls_and_parameters(src_dir: Path, exclude_file: Path, out_dir: Path)
         )
     pool.join()
 
-    (result_calls, result_parameters, result_values) = _merge_results(out_dir)
-    _aggregate_results(out_dir, result_calls, result_parameters, result_values)
+    (result_classes, result_calls, result_parameters, result_values) = _merge_results(out_dir)
+    # _aggregate_results(out_dir, result_calls, result_parameters, result_values)
+    _removed_classes(out_dir, result_classes)
 
 
 def _initialize_process_environment(lock: multiprocessing.Lock):
@@ -119,14 +122,15 @@ def _do_count_calls_and_parameters(
             f.write(f"{python_file}\n")
 
 
-def _merge_results(out_dir: Path) -> tuple[CallStore, ParameterStore, ValueStore]:
+def _merge_results(out_dir: Path) -> tuple[ClassStore, CallStore, ParameterStore, ValueStore]:
+    result_classes: ClassStore = {}
     result_calls: CallStore = {}
     result_parameters: ParameterStore = {}
     result_values: ValueStore = {}
 
     # Include all callables and parameters (and their default values) from relevant packages
     for package_name in _relevant_packages:
-        callables = list_all_callables(package_name)
+        callables, classes = list_all_callables(package_name)
 
         for callable_name, parameters in callables.items():
             result_calls[callable_name] = []
@@ -139,6 +143,9 @@ def _merge_results(out_dir: Path) -> tuple[CallStore, ParameterStore, ValueStore
                     "defaultValue": default_value,
                     "values": {}
                 }
+
+        for class_name in classes:
+            result_classes[class_name] = []
 
     files = list_files(out_dir, ".json")
     for index, file in enumerate(files):
@@ -189,7 +196,14 @@ def _merge_results(out_dir: Path) -> tuple[CallStore, ParameterStore, ValueStore
 
                     result_values[callable_name][parameter_name]["values"][stringified_value].extend(occurrences)
 
+    # merge classes
+    for class_name in result_classes.keys():
+        for callable_name, occurrences in result_calls.items():
+            if callable_name.startswith(class_name):
+                result_classes[class_name].extend(occurrences)
+
     result_occurrences = {
+        "classes": result_classes,
         "calls": result_calls,
         "parameters": result_parameters,
         "values": result_values
@@ -198,7 +212,7 @@ def _merge_results(out_dir: Path) -> tuple[CallStore, ParameterStore, ValueStore
     with out_dir.joinpath("$$$$$merged_occurrences$$$$$.json").open("w") as f:
         json.dump(result_occurrences, f, indent=4)
 
-    return result_calls, result_parameters, result_values
+    return result_classes, result_calls, result_parameters, result_values
 
 
 def _aggregate_results(out_dir: Path, result_calls: CallStore, result_parameters: ParameterStore,
@@ -206,6 +220,74 @@ def _aggregate_results(out_dir: Path, result_calls: CallStore, result_parameters
     call_counts, parameter_counts, value_counts = _count(out_dir, result_calls, result_parameters, result_values)
     _count_distribution(out_dir, call_counts, value_counts)
     _affected_occurrences(out_dir, result_calls, result_values, call_counts, value_counts)
+
+
+def _removed_classes(out_dir: Path, class_store: ClassStore):
+    all_public_classes = set(class_store.keys())
+
+    used_public_classes: set[str] = set()
+    for class_name, occurrences in class_store.items():
+        if len(occurrences) > 0:
+            used_public_classes.add(class_name)
+    unused_public_classes = all_public_classes.difference(used_public_classes)
+
+    relevant_public_classes: set[str] = set()
+    for class_name in class_store.keys():
+        if is_relevant(class_name):
+            relevant_public_classes.add(class_name)
+    irrelevant_public_classes = all_public_classes.difference(relevant_public_classes)
+
+    used_irrelevant_public_classes = irrelevant_public_classes.difference(unused_public_classes)
+
+    removed_public_classes = unused_public_classes.union(irrelevant_public_classes)
+
+    removed_relevant_public_classes = removed_public_classes.difference(irrelevant_public_classes)
+
+    with out_dir.joinpath("$$$$$merged_removed_classes$$$$$.json").open("w") as f:
+        json.dump(
+            {
+                "all_public_classes": sorted(all_public_classes),
+                "number_of_all_public_classes": len(all_public_classes),
+
+                "used_public_classes": sorted(used_public_classes),
+                "number_of_used_public_classes": len(used_public_classes),
+
+                "unused_public_classes": sorted(unused_public_classes),
+                "number_of_unused_public_classes": len(unused_public_classes),
+
+                "relevant_public_classes": sorted(relevant_public_classes),
+                "number_of_relevant_public_classes": len(relevant_public_classes),
+
+                "irrelevant_public_classes": sorted(irrelevant_public_classes),
+                "number_of_irrelevant_public_classes": len(irrelevant_public_classes),
+
+                "used_irrelevant_public_classes": sorted(used_irrelevant_public_classes),
+                "number_of_used_irrelevant_public_classes": len(used_irrelevant_public_classes),
+
+                "removed_public_classes": sorted(removed_public_classes),
+                "number_of_removed_public_classes": len(removed_public_classes),
+
+                "removed_relevant_public_classes": sorted(removed_relevant_public_classes),
+                "number_of_removed_relevant_public_classes": len(removed_relevant_public_classes)
+            },
+            f,
+            indent=4
+        )
+
+
+def is_relevant(qname: str) -> bool:
+    return all(it not in qname for it in [
+
+        # Testing
+        "._mocking.",
+        "._testing.",
+        ".tests.",
+
+        # Other
+        "sklearn.exceptions.",
+        "sklearn.externals.",
+        "sklearn.utils."
+    ])
 
 
 def _count(
