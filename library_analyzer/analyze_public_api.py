@@ -4,22 +4,38 @@ from typing import Optional
 
 import astroid
 
-from .utils import list_files, ASTWalker
+from utils import list_files, ASTWalker
 
 # Type aliases
 CallableStore = dict[str, dict[str, Optional[str]]]
 
 
-def list_all_callables(package_name: str) -> tuple[CallableStore, set[str]]:
+def get_public_api(package_name: str) -> tuple[CallableStore, set[str]]:
     root = _package_root(package_name)
     files = list_files(root, ".py")
+    files = _init_files_first(files)
 
     callable_visitor = _CallableVisitor()
+    walker = ASTWalker(callable_visitor)
     for file in files:
-        callable_visitor.qname_root = _qname_root(root, Path(file))
+        posix_path = Path(file).as_posix()
+        print(f"Working on file {posix_path}")
+
+        if _is_test_file(posix_path):
+            print("Skipping test file.")
+            continue
+
+        # TODO just use the qualified name; now that we passed in the module name it should work
+        callable_visitor.qname_root = _module_name(root, Path(file))
         with open(file, "r") as f:
             source = f.read()
-            ASTWalker(callable_visitor).walk(astroid.parse(source))
+            walker.walk(
+                astroid.parse(
+                    source,
+                    module_name=_module_name(root, Path(file)),
+                    path=file
+                )
+            )
 
     return callable_visitor.callables, callable_visitor.classes
 
@@ -29,31 +45,66 @@ def _package_root(package_name: str) -> Path:
     return Path(path_as_string).parent
 
 
-def _qname_root(root: Path, file: Path) -> str:
+def _init_files_first(files: list[str]) -> list[str]:
+    init_files = []
+    other_files = []
+
+    for file in files:
+        if file.endswith("__init__.py"):
+            init_files.append(file)
+        else:
+            other_files.append(file)
+
+    return init_files + other_files
+
+
+
+def _is_test_file(posix_path: str) -> bool:
+    return "/test/" in posix_path or "/tests/" in posix_path
+
+
+
+def _module_name(root: Path, file: Path) -> str:
     relative_path = file.relative_to(root.parent).as_posix()
     return str(relative_path).replace(".py", "").replace("/", ".")
 
 
 class _CallableVisitor:
     def __init__(self) -> None:
+        self.reexported: set[str] = set()
         self.qname_root: str = ""
         self.callables: CallableStore = {}
         self.classes: set[str] = set()
 
+    def visit_module(self, module_node: astroid.Module):
+        if not _is_init_file(module_node.file):
+            return
+
+        for _, global_declaration_node_list in module_node.globals.items():
+            global_declaration_node = global_declaration_node_list[0]
+
+            if isinstance(global_declaration_node, astroid.ImportFrom):
+                base_import_path = module_node.relative_to_absolute_name(
+                    global_declaration_node.modname,
+                    global_declaration_node.level
+                )
+
+                for declaration, _ in global_declaration_node.names:
+                    reexported_name = f"{base_import_path}.{declaration}"
+
+                    if reexported_name.startswith(module_node.name):
+                        self.reexported.add(reexported_name)
+
     def visit_classdef(self, node: astroid.ClassDef) -> None:
         qname = f"{self.qname_root}{node.qname()}"
 
-        if _CallableVisitor.is_relevant(node.name, qname):
-            print(f"Working on class {qname}")
-
+        if self.is_public(node.name, qname):
             self.classes.add(qname)
 
     def visit_functiondef(self, node: astroid.FunctionDef) -> None:
         qname = f"{self.qname_root}{node.qname()}"
 
-        if _CallableVisitor.is_relevant(node.name, qname):
-            print(f"Working on function {qname}")
-
+        if self.is_public(node.name, qname):
             if qname not in self.callables:
                 self.callables[qname] = self._function_parameters(node)
 
@@ -100,13 +151,15 @@ class _CallableVisitor:
         else:
             return None
 
-    @staticmethod
-    def is_relevant(name: str, qname: str) -> bool:
-        qualified_name_parts = qname.split(".")
+    def is_public(self, name: str, qualified_name: str) -> bool:
+        if name.startswith("_") and not name.startswith("__"):
+            return False
 
-        return not name.startswith("_") or name.startswith("__")
+        if qualified_name in self.reexported:
+            return True
 
-    def publicly_reexported(qname: str) -> bool:
-        return qname in {
-            "sklearn._loss.glm_distribution."
-        }
+        return all(not it.startswith("_") for it in qualified_name.split("."))
+
+
+def _is_init_file(path: str) -> bool:
+    return path.endswith("__init__.py")

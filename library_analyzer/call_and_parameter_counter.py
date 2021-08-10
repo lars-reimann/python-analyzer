@@ -8,7 +8,7 @@ import astroid
 from astroid.arguments import CallSite
 from astroid.helpers import safe_infer
 
-from .all_callables_in_library import list_all_callables
+from .analyze_public_api import get_public_api
 from .utils import ASTWalker, list_files, initialize_and_read_exclude_file
 
 # Type aliases
@@ -130,7 +130,7 @@ def _merge_results(out_dir: Path) -> tuple[ClassStore, CallStore, ParameterStore
 
     # Include all callables and parameters (and their default values) from relevant packages
     for package_name in _relevant_packages:
-        callables, classes = list_all_callables(package_name)
+        callables, classes = get_public_api(package_name)
 
         for callable_name, parameters in callables.items():
             result_calls[callable_name] = []
