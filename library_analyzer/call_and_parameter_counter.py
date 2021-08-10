@@ -161,7 +161,8 @@ def _merge_results(out_dir: Path) -> tuple[ClassStore, CallStore, ParameterStore
         call_store: CallStore = content["calls"]
         for callable_name, occurrences in call_store.items():
             if callable_name not in result_calls:
-                result_calls[callable_name] = []
+                # not part of the public API
+                continue
 
             result_calls[callable_name].extend(occurrences)
 
