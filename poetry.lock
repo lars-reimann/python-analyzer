@@ -1,6 +1,6 @@
 [[package]]
 name = "astroid"
-version = "2.6.6"
+version = "2.7.1"
 description = "An abstract syntax tree for Python with inference support."
 category = "main"
 optional = false
@@ -84,12 +84,12 @@ python-versions = "*"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "fcbce2377cf8d1c2dee6786687530b094a5e3c78764fa6eca121603237d8077b"
+content-hash = "355db10f8655e1f2efe825f0690eaa0b7dd411edd48226f3c067133262f92d16"
 
 [metadata.files]
 astroid = [
-    {file = "astroid-2.6.6-py3-none-any.whl", hash = "sha256:ab7f36e8a78b8e54a62028ba6beef7561db4cdb6f2a5009ecc44a6f42b5697ef"},
-    {file = "astroid-2.6.6.tar.gz", hash = "sha256:3975a0bd5373bdce166e60c851cfcbaf21ee96de80ec518c1f4cb3e94c3fb334"},
+    {file = "astroid-2.7.1-py3-none-any.whl", hash = "sha256:60a3eb3429c72fa886ca80cd4f114900bdf84a5aff88f9e3864ac8f54d376bb2"},
+    {file = "astroid-2.7.1.tar.gz", hash = "sha256:f3083366b7bb8b3a72c0e12841ab07f14b0d7ff5cc1c89676b84d8f5832e4b61"},
 ]
 joblib = [
     {file = "joblib-1.0.1-py3-none-any.whl", hash = "sha256:feeb1ec69c4d45129954f1b7034954241eedfd6ba39b5e9e4b6883be3332d5e5"},
