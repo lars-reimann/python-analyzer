@@ -4,7 +4,7 @@ from typing import Optional
 
 import astroid
 
-from .utils import list_files, ASTWalker
+from library_analyzer.utils import list_files, ASTWalker
 
 # Type aliases
 CallableStore = dict[str, dict[str, Optional[str]]]
@@ -13,7 +13,7 @@ CallableStore = dict[str, dict[str, Optional[str]]]
 def get_public_api(package_name: str) -> tuple[CallableStore, set[str]]:
     root = _package_root(package_name)
     files = list_files(root, ".py")
-    files = _init_files_first(files)
+    files = _move_init_files_to_front(files)
 
     callable_visitor = _CallableVisitor()
     walker = ASTWalker(callable_visitor)
@@ -43,21 +43,17 @@ def _package_root(package_name: str) -> Path:
     return Path(path_as_string).parent
 
 
-def _init_files_first(files: list[str]) -> list[str]:
+def _move_init_files_to_front(files: list[str]) -> list[str]:
     init_files = []
     other_files = []
 
     for file in files:
-        if file.endswith("__init__.py"):
+        if _is_init_file(file):
             init_files.append(file)
         else:
             other_files.append(file)
 
     return init_files + other_files
-
-
-def _is_test_file(posix_path: str) -> bool:
-    return "/test/" in posix_path or "/tests/" in posix_path
 
 
 def _module_name(root: Path, file: Path) -> str:
@@ -158,3 +154,7 @@ class _CallableVisitor:
 
 def _is_init_file(path: str) -> bool:
     return path.endswith("__init__.py")
+
+
+def _is_test_file(posix_path: str) -> bool:
+    return "/test/" in posix_path or "/tests/" in posix_path

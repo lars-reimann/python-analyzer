@@ -14,7 +14,10 @@ optional arguments:
 ```
 
 ```shell
-library-analyzer count -s "D:\Kaggle Kernels" -e "D:\excluded_files.txt" -o "D:\counter"
+library-analyzer improve -s "D:\Kaggle Kernels" -e "D:\excluded_files.txt" -o "D:\counter"
+
+poetry shell
+library-analyzer improve -s "/mnt/d/Kaggle Analysis/Kaggle Kernels" -e "/mnt/d/Kaggle Analysis/excluded_files.txt" -o "/mnt/d/Kaggle Analysis/counter"
 ```
 
 Example query on `merged_count`:

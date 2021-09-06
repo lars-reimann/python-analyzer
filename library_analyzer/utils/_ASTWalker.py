@@ -18,28 +18,28 @@ class ASTWalker:
         self._cache = {}
 
     def walk(self, node: astroid.NodeNG) -> None:
-        self._walk(node, set())
+        self.__walk(node, set())
 
-    def _walk(self, node: astroid.NodeNG, visited_nodes: set[astroid.NodeNG]) -> None:
+    def __walk(self, node: astroid.NodeNG, visited_nodes: set[astroid.NodeNG]) -> None:
         assert node not in visited_nodes
         visited_nodes.add(node)
 
-        self._enter(node)
+        self.__enter(node)
         for child_node in node.get_children():
-            self._walk(child_node, visited_nodes)
-        self._leave(node)
+            self.__walk(child_node, visited_nodes)
+        self.__leave(node)
 
-    def _enter(self, node: astroid.NodeNG) -> None:
-        method = self._get_callbacks(node)[0]
+    def __enter(self, node: astroid.NodeNG) -> None:
+        method = self.__get_callbacks(node)[0]
         if method is not None:
             method(node)
 
-    def _leave(self, node: astroid.NodeNG) -> None:
-        method = self._get_callbacks(node)[1]
+    def __leave(self, node: astroid.NodeNG) -> None:
+        method = self.__get_callbacks(node)[1]
         if method is not None:
             method(node)
 
-    def _get_callbacks(self, node: astroid.NodeNG) -> tuple[
+    def __get_callbacks(self, node: astroid.NodeNG) -> tuple[
         Callable[[astroid.NodeNG], None], Callable[[astroid.NodeNG], None]
     ]:
         klass = node.__class__

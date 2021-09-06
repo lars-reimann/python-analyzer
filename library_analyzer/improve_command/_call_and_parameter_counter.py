@@ -8,8 +8,7 @@ import astroid
 from astroid.arguments import CallSite
 from astroid.helpers import safe_infer
 
-from .analyze_public_api import get_public_api
-from .utils import ASTWalker, list_files, initialize_and_read_exclude_file
+from library_analyzer.utils import ASTWalker, list_files, initialize_and_read_exclude_file, get_public_api
 
 # Type aliases
 ClassName = str
@@ -58,13 +57,11 @@ def count_calls_and_parameters(src_dir: Path, exclude_file: Path, out_dir: Path)
 
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    length = len(python_files)
-
     lock = multiprocessing.Lock()
     with multiprocessing.Pool(processes=12, initializer=_initialize_process_environment, initargs=(lock,)) as pool:
         pool.starmap(
             _do_count_calls_and_parameters,
-            [[it[1], exclude_file, out_dir, it[0], length] for it in enumerate(python_files)]
+            [[it, exclude_file, out_dir] for it in python_files]
         )
     pool.join()
 
@@ -83,12 +80,8 @@ def _do_count_calls_and_parameters(
     python_file: str,
     exclude_file: Path,
     out_dir: Path,
-    index: int,
-    length: int,
 ):
-    with _lock:
-        print(f"Working on {python_file} ({index + 1}/{length})")
-        index += 1
+    print(f"Working on {python_file}")
 
     try:
         with open(python_file, "r") as f:

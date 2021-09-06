@@ -1,6 +1,6 @@
 import time
 
-from cli import cli
+from .cli import cli
 
 
 def main() -> None:
