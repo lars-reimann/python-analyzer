@@ -49,7 +49,7 @@ class ASTWalker:
             handler = self._handler
             class_name = klass.__name__.lower()
             enter_method = getattr(
-                handler, f"visit_{class_name}", getattr(handler, "visit_default", None)
+                handler, f"enter_{class_name}", getattr(handler, "enter_default", None)
             )
             leave_method = getattr(
                 handler, f"leave_{class_name}", getattr(handler, "leave_default", None)

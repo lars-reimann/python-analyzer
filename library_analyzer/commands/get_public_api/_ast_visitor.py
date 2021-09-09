@@ -11,7 +11,7 @@ class _CallableVisitor:
         self.reexported: set[str] = set()
         self.api: API = api
 
-    def visit_module(self, module_node: astroid.Module):
+    def enter_module(self, module_node: astroid.Module):
         """
         Find re-exported declarations in __init__.py files.
         """
@@ -34,13 +34,13 @@ class _CallableVisitor:
                     if reexported_name.startswith(module_node.name):
                         self.reexported.add(reexported_name)
 
-    def visit_classdef(self, node: astroid.ClassDef) -> None:
+    def enter_classdef(self, node: astroid.ClassDef) -> None:
         qname = node.qname()
 
         if self.is_public(node.name, qname):
             self.api.add_class(qname)
 
-    def visit_functiondef(self, node: astroid.FunctionDef) -> None:
+    def enter_functiondef(self, node: astroid.FunctionDef) -> None:
         qname = node.qname()
 
         if self.is_public(node.name, qname):

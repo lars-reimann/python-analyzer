@@ -13,7 +13,7 @@ class _UsageFinder:
         self.python_file: str = python_file
         self.usages: UsageStore = UsageStore()
 
-    def visit_call(self, node: astroid.Call):
+    def enter_call(self, node: astroid.Call):
         called_tuple = _analyze_declaration_called_by(node, self.package_name)
         if called_tuple is None:
             return
