@@ -14,13 +14,9 @@ optional arguments:
 ```
 
 ```shell
-library-analyzer improve -s "D:\Kaggle Kernels" -e "D:\excluded_files.txt" -o "D:\counter"
-
 poetry shell
-library-analyzer improve -s "/mnt/d/Kaggle Analysis/Kaggle Kernels" -e "/mnt/d/Kaggle Analysis/excluded_files.txt" -o "/mnt/d/Kaggle Analysis/counter"
-
-poetry shell
-library-analyzer api -p sklearn -o "/mnt/d/Kaggle Analysis/api"
+library-analyzer api -p sklearn -o "/mnt/d/Kaggle Analysis/out"
+library-analyzer usages -p sklearn -s "/mnt/d/Kaggle Analysis/Kaggle Kernels" -t "/mnt/d/Kaggle Analysis/tmp" -o "/mnt/d/Kaggle Analysis/out"
 ```
 
 Example query on `merged_count`:

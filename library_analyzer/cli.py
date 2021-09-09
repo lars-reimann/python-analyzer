@@ -3,12 +3,12 @@ import json
 from argparse import _SubParsersAction
 from pathlib import Path
 
+from .commands.find_usages import find_usages
+from .commands.get_public_api import distribution, distribution_version, get_public_api
 from .utils import ensure_file_exists
-from .commands.get_public_api import get_public_api
-from .commands.improve import count_calls_and_parameters
 
 __API_COMMAND = "api"
-__COUNT_COMMAND = "count"
+__USAGES_COMMAND = "usages"
 __IMPROVE_COMMAND = "improve"
 
 
@@ -19,14 +19,25 @@ def cli() -> None:
         public_api = get_public_api(args.package)
 
         out_dir: Path = args.out
-        out_file = out_dir.joinpath(f"{public_api.distribution}__{public_api.package}__{public_api.version}.json")
+        out_file = out_dir.joinpath(f"{public_api.distribution}__{public_api.package}__{public_api.version}__api.json")
         ensure_file_exists(out_file)
         with out_file.open("w") as f:
-            json.dump(public_api.to_json(), f, indent=4)
-    elif args.command == __COUNT_COMMAND:
-        pass
+            json.dump(public_api.to_json(), f, indent=2)
+
+    elif args.command == __USAGES_COMMAND:
+        usages = find_usages(args.package, args.src, args.tmp)
+
+        out_dir: Path = args.out
+        out_file = out_dir.joinpath(
+            f"{distribution(args.package)}__{args.package}__{distribution_version(args.package)}__usages.json"
+        )
+        ensure_file_exists(out_file)
+        with out_file.open("w") as f:
+            json.dump(usages.to_json(), f, indent=2)
+
     elif args.command == __IMPROVE_COMMAND:
-        count_calls_and_parameters(args.src, args.exclude, args.out)
+        # TODO
+        pass
 
 
 def __get_args() -> argparse.Namespace:
@@ -35,33 +46,69 @@ def __get_args() -> argparse.Namespace:
     # Commands
     subparsers = parser.add_subparsers(dest="command")
     __add_api_subparser(subparsers)
-    __add_count_subparser(subparsers)
+    __add_usages_subparser(subparsers)
     __add_improve_subparser(subparsers)
 
     return parser.parse_args()
 
 
 def __add_api_subparser(subparsers: _SubParsersAction) -> None:
-    improve_parser = subparsers.add_parser(
+    api_parser = subparsers.add_parser(
         __API_COMMAND,
         help="List the public API of a package."
     )
-    improve_parser.add_argument(
+    api_parser.add_argument(
         "-p",
         "--package",
         help="The name of the package. It must be installed in the current interpreter.",
         type=str,
         required=True,
     )
-    improve_parser.add_argument(
-        "-o", "--out", help="Output directory.", type=Path, required=True
+    api_parser.add_argument(
+        "-o",
+        "--out",
+        help="Output directory.",
+        type=Path,
+        required=True
     )
 
 
-def __add_count_subparser(subparsers: _SubParsersAction) -> None:
-    pass
+def __add_usages_subparser(subparsers: _SubParsersAction) -> None:
+    usages_parser = subparsers.add_parser(
+        __USAGES_COMMAND,
+        help="Find usages of API elements."
+    )
+    usages_parser.add_argument(
+        "-p",
+        "--package",
+        help="The name of the package. It must be installed in the current interpreter.",
+        type=str,
+        required=True,
+    )
+    usages_parser.add_argument(
+        "-s",
+        "--src",
+        help="Directory containing Python code.",
+        type=Path,
+        required=True,
+    )
+    usages_parser.add_argument(
+        "-t",
+        "--tmp",
+        help="Directory where temporary files can be stored (to save progress in case the program crashes).",
+        type=Path,
+        required=True,
+    )
+    usages_parser.add_argument(
+        "-o",
+        "--out",
+        help="Output file.",
+        type=Path,
+        required=True
+    )
 
 
+# TODO
 def __add_improve_subparser(subparsers: _SubParsersAction) -> None:
     improve_parser = subparsers.add_parser(
         __IMPROVE_COMMAND,
