@@ -1,4 +1,3 @@
-import sys
 from typing import Optional
 
 import astroid
@@ -55,7 +54,7 @@ def _analyze_declaration_called_by(node: astroid.Call, package_name: str) -> Opt
     """
 
     called = safe_infer(node.func)
-    if called is None or isinstance(called, astroid.Lambda) or not __is_relevant_qualified_name(
+    if called is None or not __is_relevant_qualified_name(
         package_name,
         called.qname()
     ):

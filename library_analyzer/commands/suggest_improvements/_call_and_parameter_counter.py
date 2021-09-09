@@ -29,6 +29,9 @@ _relevant_packages = {
     "sklearn",
 }
 
+
+# TODO: step 1: add_implicit_default_values
+
 def _merge_results(out_dir: Path) -> tuple[ClassStore, CallStore, ParameterStore, ValueStore]:
     result_classes: ClassStore = {}
     result_calls: CallStore = {}
@@ -121,6 +124,7 @@ def _merge_results(out_dir: Path) -> tuple[ClassStore, CallStore, ParameterStore
         json.dump(result_occurrences, f, indent=4)
 
     return result_classes, result_calls, result_parameters, result_values
+
 
 def _aggregate_results(out_dir: Path, result_calls: CallStore, result_parameters: ParameterStore,
                        result_values: ValueStore):
@@ -412,8 +416,3 @@ def _n_affected_files(
                 affected_files.add(occurrence[0])
 
     return len(affected_files)
-
-
-
-
-

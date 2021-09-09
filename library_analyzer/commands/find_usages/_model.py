@@ -18,26 +18,26 @@ class UsageStore:
         class_usages = json["class_usages"]
         for qname, locations in class_usages.items():
             for location in locations:
-                result.add_class_usage(qname, location)
+                result.add_class_usage(qname, Location.from_json(location))
 
         # Revive function usages
         function_usages = json["function_usages"]
         for qname, locations in function_usages.items():
             for location in locations:
-                result.add_function_usage(qname, location)
+                result.add_function_usage(qname, Location.from_json(location))
 
         # Revive parameter usages
         parameter_usages = json["parameter_usages"]
         for qname, locations in parameter_usages.items():
             for location in locations:
-                result.add_parameter_usage(qname, location)
+                result.add_parameter_usage(qname, Location.from_json(location))
 
         # Revive value usages
         value_usages = json["value_usages"]
         for parameter_qname, values in value_usages.items():
             for value, locations in values.items():
                 for location in locations:
-                    result.add_value_usage(parameter_qname, value, location)
+                    result.add_value_usage(parameter_qname, value, Location.from_json(location))
 
         return result
 
@@ -197,6 +197,15 @@ ColumnNumber = int
 
 
 class Location:
+
+    @staticmethod
+    def from_json(json: Any) -> Location:
+        return Location(
+            json["file"],
+            json["line"],
+            json["column"]
+        )
+
     def __init__(self, file: FileName, line: Optional[LineNumber], column: Optional[ColumnNumber]) -> None:
         self.file: FileName = file
         self.line: Optional[LineNumber] = line

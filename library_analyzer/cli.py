@@ -27,9 +27,11 @@ def cli() -> None:
     elif args.command == __USAGES_COMMAND:
         usages = find_usages(args.package, args.src, args.tmp)
 
+        dist = distribution(args.package)
+
         out_dir: Path = args.out
         out_file = out_dir.joinpath(
-            f"{distribution(args.package)}__{args.package}__{distribution_version(args.package)}__usages.json"
+            f"{dist}__{args.package}__{distribution_version(dist)}__usages.json"
         )
         ensure_file_exists(out_file)
         with out_file.open("w") as f:
