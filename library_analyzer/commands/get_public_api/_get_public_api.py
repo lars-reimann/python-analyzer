@@ -1,21 +1,23 @@
 import importlib
+from importlib_metadata import packages_distributions, version
 from pathlib import Path
 from typing import Optional
 
 import astroid
 
+from ._model import API, Parameter, Function
 from library_analyzer.utils import list_files, ASTWalker
 
-# Type aliases
-CallableStore = dict[str, dict[str, Optional[str]]]
 
+def get_public_api(package_name: str) -> API:
+    root = __package_root(package_name)
+    distribution = __distribution(package_name)
+    version = __distribution_version(distribution)
+    files = __package_files(package_name)
 
-def get_public_api(package_name: str) -> tuple[CallableStore, set[str]]:
-    root = _package_root(package_name)
-    files = list_files(root, ".py")
-    files = _move_init_files_to_front(files)
+    api = API(distribution, package_name, version)
 
-    callable_visitor = _CallableVisitor()
+    callable_visitor = _CallableVisitor(api)
     walker = ASTWalker(callable_visitor)
     for file in files:
         posix_path = Path(file).as_posix()
@@ -35,15 +37,36 @@ def get_public_api(package_name: str) -> tuple[CallableStore, set[str]]:
                 )
             )
 
-    return callable_visitor.callables, callable_visitor.classes
+    return callable_visitor.api
 
 
-def _package_root(package_name: str) -> Path:
+def __package_files(package_name: str) -> list[str]:
+    root = __package_root(package_name)
+    files = list_files(root, ".py")
+    return __move_init_files_to_front(files)
+
+
+def __package_root(package_name: str) -> Path:
     path_as_string = importlib.import_module(package_name).__file__
     return Path(path_as_string).parent
 
 
-def _move_init_files_to_front(files: list[str]) -> list[str]:
+def __distribution(package_name: str) -> Optional[str]:
+    distribution = packages_distributions().get(package_name)
+    if distribution is None or len(distribution) == 0:
+        return None
+
+    return distribution[0]
+
+
+def __distribution_version(distribution: Optional[str]) -> Optional[str]:
+    if distribution is None:
+        return None
+
+    return version(distribution)
+
+
+def __move_init_files_to_front(files: list[str]) -> list[str]:
     init_files = []
     other_files = []
 
@@ -62,10 +85,9 @@ def _module_name(root: Path, file: Path) -> str:
 
 
 class _CallableVisitor:
-    def __init__(self) -> None:
+    def __init__(self, api: API) -> None:
         self.reexported: set[str] = set()
-        self.callables: CallableStore = {}
-        self.classes: set[str] = set()
+        self.api: API = api
 
     def visit_module(self, module_node: astroid.Module):
         if not _is_init_file(module_node.file):
@@ -90,17 +112,17 @@ class _CallableVisitor:
         qname = node.qname()
 
         if self.is_public(node.name, qname):
-            self.classes.add(qname)
+            self.api.add_class(qname)
 
     def visit_functiondef(self, node: astroid.FunctionDef) -> None:
         qname = node.qname()
 
         if self.is_public(node.name, qname):
-            if qname not in self.callables:
-                self.callables[qname] = self._function_parameters(node)
+            if qname not in self.api.functions:
+                self.api.functions[qname] = Function(qname, self._function_parameters(node))
 
     @staticmethod
-    def _function_parameters(node: astroid.FunctionDef) -> dict[str, Optional[str]]:
+    def _function_parameters(node: astroid.FunctionDef) -> list[Parameter]:
         parameters: astroid.Arguments = node.args
         n_implicit_parameters = node.implicit_parameters()
 
@@ -126,11 +148,11 @@ class _CallableVisitor:
             for index, it in enumerate(parameters.kwonlyargs)
         ]
 
-        return {
-            name: default
+        return [
+            Parameter(name, default)
             for name, default in result[n_implicit_parameters:]
             if name != "self"
-        }
+        ]
 
     @staticmethod
     def _parameter_default(defaults: list[astroid.NodeNG], default_index: int) -> Optional[str]:

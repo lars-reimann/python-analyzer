@@ -18,6 +18,9 @@ library-analyzer improve -s "D:\Kaggle Kernels" -e "D:\excluded_files.txt" -o "D
 
 poetry shell
 library-analyzer improve -s "/mnt/d/Kaggle Analysis/Kaggle Kernels" -e "/mnt/d/Kaggle Analysis/excluded_files.txt" -o "/mnt/d/Kaggle Analysis/counter"
+
+poetry shell
+library-analyzer api -p sklearn -o "/mnt/d/Kaggle Analysis/api"
 ```
 
 Example query on `merged_count`:

@@ -8,7 +8,8 @@ import astroid
 from astroid.arguments import CallSite
 from astroid.helpers import safe_infer
 
-from library_analyzer.utils import ASTWalker, list_files, initialize_and_read_exclude_file, get_public_api
+from library_analyzer.commands.get_public_api import get_public_api
+from library_analyzer.utils import ASTWalker, list_files, initialize_and_read_exclude_file
 
 # Type aliases
 ClassName = str
@@ -596,8 +597,8 @@ def _called_constructor(class_def: astroid.ClassDef) -> Optional[astroid.Functio
     except astroid.NotFoundError:
         new = None
 
-    new_is_from_object = new and new.parent.scope().name == "object"
-    new_is_from_builtins = new and new.root().name in sys.builtin_module_names
+    new_is_from_object = new and new.parent.scope().qname == "object"
+    new_is_from_builtins = new and new.root().qname in sys.builtin_module_names
 
     if new is None or new_is_from_object or new_is_from_builtins:
         try:
