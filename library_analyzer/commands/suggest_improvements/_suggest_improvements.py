@@ -26,8 +26,24 @@ def suggest_improvements(
     print(len(usages.value_usages))
 
 
-def remove_internal_usages(usages: UsageStore, public_api: API):
+def remove_internal_usages(usages: UsageStore, public_api: API) -> None:
+    """
+    Removes usages of internal parts of the API. It might incorrectly remove some calls to methods that are inherited
+    from internal classes into a public class but these are just fit/predict/etc., i.e. something we want to keep
+    unchanged anyway.
+
+    :param usages: Usage store
+    :param public_api: Description of the public API
+    """
+
+    # Internal classes
     for class_qname in list(usages.class_usages.keys()):
         if class_qname not in public_api.classes:
             print(f"Removing usages of internal class {class_qname}.")
             del usages.class_usages[class_qname]
+
+    # Internal functions
+    for function_qname in list(usages.function_usages.keys()):
+        if function_qname not in public_api.functions:
+            print(f"Removing usages of internal function {function_qname}.")
+            del usages.function_usages[function_qname]

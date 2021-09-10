@@ -21,10 +21,10 @@ def get_public_api(package_name: str) -> API:
 
     for file in files:
         posix_path = Path(file).as_posix()
-        print(f"Working on file {posix_path}")
+        # print(f"Working on file {posix_path}")
 
         if _is_test_file(posix_path):
-            print("Skipping test file.")
+            # print("Skipping test file.")
             continue
 
         with open(file, "r") as f:

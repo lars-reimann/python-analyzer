@@ -97,8 +97,9 @@ class _CallableVisitor:
         if qualified_name in self.reexported:
             return True
 
-        # Containing class is re-exported
+        # Containing class is re-exported (always false if the current API element is not a method)
         if ".".join(qualified_name.split(".")[:-1]) in self.reexported:
             return True
 
-        return all(not it.startswith("_") for it in qualified_name.split("."))
+        # The slicing is necessary so __init__ functions are not excluded (already handled in the first condition).
+        return all(not it.startswith("_") for it in qualified_name.split(".")[:-1])
