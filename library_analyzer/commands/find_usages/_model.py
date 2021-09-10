@@ -236,6 +236,16 @@ class Location:
         self.line: Optional[LineNumber] = line
         self.column: Optional[ColumnNumber] = column
 
+    def __repr__(self) -> str:
+        return f"{self.file}@{self.line}:{self.column}"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, type(self)): return NotImplemented
+        return self.file == other.file and self.line == other.line and self.column == other.column
+
+    def __hash__(self) -> int:
+        return hash((self.file, self.line, self.column))
+
     def to_json(self) -> Any:
         return {
             "file": self.file,

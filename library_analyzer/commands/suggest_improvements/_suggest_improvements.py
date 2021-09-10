@@ -23,6 +23,7 @@ def suggest_improvements(
 
     remove_internal_usages(usages, public_api)
     add_unused_api_elements(usages, public_api)
+    add_implicit_usages_of_default_value(usages, public_api)
 
     print(len(public_api.classes))
     print(len(usages.value_usages))
@@ -58,8 +59,8 @@ def remove_internal_usages(usages: UsageStore, public_api: API) -> None:
             usages.remove_parameter(parameter_qname)
             usages.remove_value(parameter_qname)
 
-def add_unused_api_elements(usages: UsageStore, public_api: API) -> None:
 
+def add_unused_api_elements(usages: UsageStore, public_api: API) -> None:
     # Public classes
     for class_qname in public_api.classes:
         usages.init_class(class_qname)
@@ -75,3 +76,18 @@ def add_unused_api_elements(usages: UsageStore, public_api: API) -> None:
             usages.init_value(parameter_qname)
 
 
+def add_implicit_usages_of_default_value(usages: UsageStore, public_api: API) -> None:
+    for parameter_qname, parameter_usage_list in list(usages.parameter_usages.items()):
+        default_value = public_api.get_default_value(parameter_qname)
+        function_qname = parent_qname(parameter_qname)
+        function_usage_list = usages.function_usages[function_qname]
+
+        locations_of_implicit_usages_of_default_value = set(
+            [it.location for it in function_usage_list]
+        ) - set(
+            [it.location for it in parameter_usage_list]
+        )
+
+        for location in locations_of_implicit_usages_of_default_value:
+            usages.add_parameter_usage(parameter_qname, location)
+            usages.add_value_usage(parameter_qname, default_value, location)

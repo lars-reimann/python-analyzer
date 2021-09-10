@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from library_analyzer.utils import parent_qname
+
 
 class API:
 
@@ -34,6 +36,19 @@ class API:
     def add_function(self, function: Function) -> None:
         self.functions[function.qname] = function
 
+    def get_default_value(self, parameter_qname: str) -> Optional[str]:
+        function_qname = parent_qname(parameter_qname)
+        parameter_name = parameter_qname.split(".")[-1]
+
+        if function_qname not in self.functions:
+            return None
+
+        for parameter in self.functions[function_qname].parameters:
+            if parameter.name == parameter_name:
+                return parameter.default_value
+
+        return None
+
     def to_json(self) -> Any:
         return {
             "distribution": self.distribution,
@@ -45,6 +60,7 @@ class API:
                 for function in sorted(self.functions.values(), key=lambda it: it.qname)
             ]
         }
+
 
 class Function:
 
@@ -68,6 +84,7 @@ class Function:
             ]
         }
 
+
 class Parameter:
 
     @staticmethod
@@ -86,4 +103,3 @@ class Parameter:
             "name": self.name,
             "default_value": self.default_value
         }
-
