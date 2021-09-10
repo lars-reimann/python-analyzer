@@ -55,9 +55,13 @@ class UsageStore:
         if qname not in self.class_usages:
             self.class_usages[qname] = []
 
-    def remove_class(self, qname: ClassQName) -> None:
-        if qname in self.class_usages:
-            del self.class_usages[qname]
+    def remove_class(self, class_qname: ClassQName) -> None:
+        if class_qname in self.class_usages:
+            del self.class_usages[class_qname]
+
+        for function_qname in list(self.function_usages.keys()):
+            if function_qname.startswith(class_qname):
+                self.remove_function(function_qname)
 
     def add_function_usage(self, qname: FunctionQName, location: Location) -> None:
         self.init_function(qname)
@@ -67,9 +71,13 @@ class UsageStore:
         if qname not in self.function_usages:
             self.function_usages[qname] = []
 
-    def remove_function(self, qname: FunctionQName) -> None:
-        if qname in self.function_usages:
-            del self.function_usages[qname]
+    def remove_function(self, function_qname: FunctionQName) -> None:
+        if function_qname in self.function_usages:
+            del self.function_usages[function_qname]
+
+        for parameter_qname in list(self.parameter_usages.keys()):
+            if parameter_qname.startswith(function_qname):
+                self.remove_parameter(parameter_qname)
 
     def add_parameter_usage(self, qname: ParameterQName, location: Location) -> None:
         self.init_parameter(qname)
@@ -82,6 +90,8 @@ class UsageStore:
     def remove_parameter(self, qname: ParameterQName) -> None:
         if qname in self.parameter_usages:
             del self.parameter_usages[qname]
+
+        self.remove_value(qname)
 
     def add_value_usage(self, parameter_qname: ParameterQName, value: StringifiedValue, location: Location) -> None:
         self.init_value(parameter_qname)
@@ -98,6 +108,44 @@ class UsageStore:
     def remove_value(self, qname: ParameterQName) -> None:
         if qname in self.value_usages:
             del self.value_usages[qname]
+
+    def n_class_usages(self, qname: ClassQName) -> int:
+        if qname in self.class_usages:
+            return len(self.class_usages[qname])
+
+        return 0
+
+    def n_function_usages(self, qname: FunctionQName) -> int:
+        if qname in self.function_usages:
+            return len(self.function_usages[qname])
+
+        return 0
+
+    def n_parameter_usages(self, qname: ParameterQName) -> int:
+        if qname in self.parameter_usages:
+            return len(self.parameter_usages[qname])
+
+        return 0
+
+    def n_value_usages(self, qname: ParameterQName, value: str) -> int:
+        if qname in self.value_usages and value in self.value_usages[qname]:
+            return len(self.value_usages[qname][value])
+
+        return 0
+
+    def most_common_value(self, qname: ParameterQName) -> Optional[str]:
+        if qname not in self.value_usages:
+            return None
+
+        result = None
+        count = 0
+
+        for value, usages in self.value_usages[qname].items():
+            if len(usages) > count:
+                result = value
+                count = len(usages)
+
+        return result
 
     def merge_other_into_self(self, other_usage_store: UsageStore) -> UsageStore:
         """

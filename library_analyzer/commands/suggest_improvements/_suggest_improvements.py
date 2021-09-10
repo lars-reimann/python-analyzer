@@ -26,10 +26,8 @@ def suggest_improvements(
 
     __preprocess_usages(usages, public_api)
     __create_usage_distributions(usages, out_dir, base_file_name)
-
-    # TODO: Remove classes that are used fewer than min_usages times (and their functions + parameters + values)
-    # TODO: Remove functions that are used fewer than min_usages times (and their parameters + values)
-    # TODO: Remove parameters that are used fewer than min_usages times (and their values)
+    __remove_rarely_used_api_elements(usages, min_usages, out_dir, base_file_name)
+    __optional_vs_required_parameters(usages, public_api, out_dir, base_file_name)
 
 
 def __preprocess_usages(usages: UsageStore, public_api: API) -> None:
@@ -39,17 +37,17 @@ def __preprocess_usages(usages: UsageStore, public_api: API) -> None:
 
 
 def __create_usage_distributions(usages: UsageStore, out_dir: Path, base_file_name: str) -> None:
-    class_usage_distribution = __create_usage_distribution(usages.class_usages)
+    class_usage_distribution = __create_class_or_function_usage_distribution(usages.class_usages)
     with out_dir.joinpath(f"{base_file_name}__class_usage_distribution.json").open("w") as f:
         json.dump(class_usage_distribution, f, indent=2)
 
-    function_usage_distribution = __create_usage_distribution(usages.function_usages)
+    function_usage_distribution = __create_class_or_function_usage_distribution(usages.function_usages)
     with out_dir.joinpath(f"{base_file_name}__function_usage_distribution.json").open("w") as f:
         json.dump(function_usage_distribution, f, indent=2)
 
-    parameter_usage_distribution = __create_parameter_usage_distribution(usages.parameter_usages, usages.value_usages)
-    with out_dir.joinpath(f"{base_file_name}__parameter_usage_distribution.json").open("w") as f:
-        json.dump(parameter_usage_distribution, f, indent=2)
+    # parameter_usage_distribution = __create_parameter_usage_distribution(usages.parameter_usages, usages.value_usages)
+    # with out_dir.joinpath(f"{base_file_name}__parameter_usage_distribution.json").open("w") as f:
+    #     json.dump(parameter_usage_distribution, f, indent=2)
 
 
 def __remove_internal_usages(usages: UsageStore, public_api: API) -> None:
@@ -80,7 +78,6 @@ def __remove_internal_usages(usages: UsageStore, public_api: API) -> None:
         if function_qname not in public_api.functions:
             print(f"Removing usages of internal parameter {parameter_qname}")
             usages.remove_parameter(parameter_qname)
-            usages.remove_value(parameter_qname)
 
 
 def __add_unused_api_elements(usages: UsageStore, public_api: API) -> None:
@@ -116,7 +113,7 @@ def __add_implicit_usages_of_default_value(usages: UsageStore, public_api: API) 
             usages.add_value_usage(parameter_qname, default_value, location)
 
 
-def __create_usage_distribution(usages: dict[str, list[Usage]]) -> dict[int, int]:
+def __create_class_or_function_usage_distribution(usages: dict[str, list[Usage]]) -> dict[int, int]:
     """
     Creates a dictionary X -> N where N indicates the number of classes/functions that are used at most X times.
 
@@ -131,6 +128,7 @@ def __create_usage_distribution(usages: dict[str, list[Usage]]) -> dict[int, int
         result[i] = len([it for it in usages.values() if len(it) <= i])
 
     return result
+
 
 def __create_parameter_usage_distribution(
     parameter_usages: dict[str, list[Usage]],
@@ -148,7 +146,7 @@ def __create_parameter_usage_distribution(
     result = {}
 
     max_usages = max(
-        __number_of_times_set_to_value_other_than_most_commonly_used_one(it, parameter_usages, value_usages)
+        __n_not_set_to_most_common_value(it, parameter_usages, value_usages)
         for it in parameter_usages.keys()
     )
 
@@ -157,18 +155,18 @@ def __create_parameter_usage_distribution(
             [
                 it
                 for it in parameter_usages.keys()
-                if __number_of_times_set_to_value_other_than_most_commonly_used_one(it, parameter_usages, value_usages) <= i
+                if __n_not_set_to_most_common_value(it, parameter_usages, value_usages) <= i
             ]
         )
 
     return result
 
 
-def __number_of_times_set_to_value_other_than_most_commonly_used_one(
+def __n_not_set_to_most_common_value(
     parameter_qname: str,
     parameter_usages: dict[str, list[Usage]],
     value_usages: dict[str, dict[str, list[Usage]]]
-):
+) -> int:
     """Counts how often a parameter is set to a value other than the most commonly used value."""
 
     n_total_usage = len(parameter_usages[parameter_qname])
@@ -183,3 +181,67 @@ def __number_of_times_set_to_value_other_than_most_commonly_used_one(
     return n_total_usage - n_set_to_most_commonly_used_value
 
 
+def __remove_rarely_used_api_elements(
+    usages: UsageStore,
+    min_usages: int,
+    out_dir: Path,
+    base_file_name: str
+) -> None:
+    rarely_used_classes = __remove_rarely_used_classes(usages, min_usages)
+    with out_dir.joinpath(f"{base_file_name}__classes_used_fewer_than_{min_usages}_times.json").open("w") as f:
+        json.dump(rarely_used_classes, f, indent=2)
+
+    rarely_used_functions = __remove_rarely_used_functions(usages, min_usages)
+    with out_dir.joinpath(f"{base_file_name}__functions_used_fewer_than_{min_usages}_times.json").open("w") as f:
+        json.dump(rarely_used_functions, f, indent=2)
+
+    rarely_used_parameters = __remove_rarely_used_parameters(usages, min_usages)
+    with out_dir.joinpath(f"{base_file_name}__parameters_used_fewer_than_{min_usages}_times.json").open("w") as f:
+        json.dump(rarely_used_parameters, f, indent=2)
+
+
+def __remove_rarely_used_classes(usages: UsageStore, min_usages: int) -> list[str]:
+    result = []
+
+    for class_qname in list(usages.class_usages.keys()):
+        if usages.n_class_usages(class_qname) < min_usages:
+            result.append(class_qname)
+            usages.remove_class(class_qname)
+
+    return sorted(result)
+
+
+def __remove_rarely_used_functions(usages: UsageStore, min_usages: int) -> list[str]:
+    result = []
+
+    for function_qname in list(usages.function_usages.keys()):
+        if usages.n_function_usages(function_qname) < min_usages:
+            result.append(function_qname)
+            usages.remove_function(function_qname)
+
+    return sorted(result)
+
+
+def __remove_rarely_used_parameters(usages: UsageStore, min_usages: int) -> list[str]:
+    result = []
+
+    for parameter_qname in list(usages.parameter_usages.keys()):
+        usage_count = __n_not_set_to_most_common_value(parameter_qname, usages.parameter_usages, usages.value_usages)
+
+        if usage_count < min_usages:
+            result.append(parameter_qname)
+            usages.remove_parameter(parameter_qname)
+
+    return sorted(result)
+
+
+def __optional_vs_required_parameters(
+    usages: UsageStore,
+    public_api: API,
+    out_dir: Path,
+    base_file_name: str
+) -> None:
+    # TODO: Determine whether parameter should be constant (already removed)/required/optional based on entropy
+    # TODO: Use must commonly set value as default
+
+    pass

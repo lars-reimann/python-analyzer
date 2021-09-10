@@ -1,11 +1,6 @@
 import json
-import sys
 from pathlib import Path
 from typing import Optional, Any
-
-import astroid
-from astroid.arguments import CallSite
-from astroid.helpers import safe_infer
 
 from library_analyzer.commands.get_public_api import get_public_api
 from library_analyzer.utils import list_files
