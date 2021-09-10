@@ -48,31 +48,56 @@ class UsageStore:
         self.value_usages: dict[ParameterQName, dict[StringifiedValue, list[ValueUsage]]] = {}
 
     def add_class_usage(self, qname: ClassQName, location: Location) -> None:
+        self.init_class(qname)
+        self.class_usages[qname].append(ClassUsage(qname, location))
+
+    def init_class(self, qname: ClassQName) -> None:
         if qname not in self.class_usages:
             self.class_usages[qname] = []
 
-        self.class_usages[qname].append(ClassUsage(qname, location))
+    def remove_class(self, qname: ClassQName) -> None:
+        if qname in self.class_usages:
+            del self.class_usages[qname]
 
     def add_function_usage(self, qname: FunctionQName, location: Location) -> None:
+        self.init_function(qname)
+        self.function_usages[qname].append(FunctionUsage(qname, location))
+
+    def init_function(self, qname: FunctionQName) -> None:
         if qname not in self.function_usages:
             self.function_usages[qname] = []
 
-        self.function_usages[qname].append(FunctionUsage(qname, location))
+    def remove_function(self, qname: FunctionQName) -> None:
+        if qname in self.function_usages:
+            del self.function_usages[qname]
 
     def add_parameter_usage(self, qname: ParameterQName, location: Location) -> None:
+        self.init_parameter(qname)
+        self.parameter_usages[qname].append(ParameterUsage(qname, location))
+
+    def init_parameter(self, qname: ParameterQName) -> None:
         if qname not in self.parameter_usages:
             self.parameter_usages[qname] = []
 
-        self.parameter_usages[qname].append(ParameterUsage(qname, location))
+    def remove_parameter(self, qname: ParameterQName) -> None:
+        if qname in self.parameter_usages:
+            del self.parameter_usages[qname]
 
     def add_value_usage(self, parameter_qname: ParameterQName, value: StringifiedValue, location: Location) -> None:
-        if parameter_qname not in self.value_usages:
-            self.value_usages[parameter_qname] = {}
+        self.init_value(parameter_qname)
 
         if value not in self.value_usages[parameter_qname]:
             self.value_usages[parameter_qname][value] = []
 
         self.value_usages[parameter_qname][value].append(ValueUsage(parameter_qname, value, location))
+
+    def init_value(self, parameter_qname: ParameterQName) -> None:
+        if parameter_qname not in self.value_usages:
+            self.value_usages[parameter_qname] = {}
+
+    def remove_value(self, qname: ParameterQName) -> None:
+        if qname in self.value_usages:
+            del self.value_usages[qname]
 
     def merge_other_into_self(self, other_usage_store: UsageStore) -> UsageStore:
         """

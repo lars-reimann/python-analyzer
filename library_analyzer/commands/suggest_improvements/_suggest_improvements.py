@@ -22,6 +22,7 @@ def suggest_improvements(
         usages = UsageStore.from_json(usages_json)
 
     remove_internal_usages(usages, public_api)
+    add_unused_api_elements(usages, public_api)
 
     print(len(public_api.classes))
     print(len(usages.value_usages))
@@ -41,18 +42,36 @@ def remove_internal_usages(usages: UsageStore, public_api: API) -> None:
     for class_qname in list(usages.class_usages.keys()):
         if class_qname not in public_api.classes:
             print(f"Removing usages of internal class {class_qname}")
-            del usages.class_usages[class_qname]
+            usages.remove_class(class_qname)
 
     # Internal functions
     for function_qname in list(usages.function_usages.keys()):
         if function_qname not in public_api.functions:
             print(f"Removing usages of internal function {function_qname}")
-            del usages.function_usages[function_qname]
+            usages.remove_function(function_qname)
 
     # Internal parameters
     for parameter_qname in list(usages.parameter_usages.keys()):
         function_qname = parent_qname(parameter_qname)
         if function_qname not in public_api.functions:
             print(f"Removing usages of internal parameter {parameter_qname}")
-            del usages.parameter_usages[parameter_qname]
-            del usages.value_usages[parameter_qname]
+            usages.remove_parameter(parameter_qname)
+            usages.remove_value(parameter_qname)
+
+def add_unused_api_elements(usages: UsageStore, public_api: API) -> None:
+
+    # Public classes
+    for class_qname in public_api.classes:
+        usages.init_class(class_qname)
+
+    # Public functions
+    for function in public_api.functions.values():
+        usages.init_function(function.qname)
+
+        # "Public" parameters
+        for parameter in function.parameters:
+            parameter_qname = f"{function.qname}.{parameter.name}"
+            usages.init_parameter(parameter_qname)
+            usages.init_value(parameter_qname)
+
+
