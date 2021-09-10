@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from library_analyzer.utils import parent_qname
+from library_analyzer.utils import declaration_name, parent_qname
 
 
 class API:
@@ -38,7 +38,7 @@ class API:
 
     def get_default_value(self, parameter_qname: str) -> Optional[str]:
         function_qname = parent_qname(parameter_qname)
-        parameter_name = parameter_qname.split(".")[-1]
+        parameter_name = declaration_name(parameter_qname)
 
         if function_qname not in self.functions:
             return None

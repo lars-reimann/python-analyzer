@@ -165,8 +165,10 @@ class UsageStore:
             },
         }
 
+class Usage:
+    pass
 
-class ClassUsage:
+class ClassUsage(Usage):
     def __init__(self, qname: ClassQName, location: Location) -> None:
         self.qname: ClassQName = qname
         self.location: Location = location
@@ -178,7 +180,7 @@ class ClassUsage:
         }
 
 
-class FunctionUsage:
+class FunctionUsage(Usage):
     def __init__(self, qname: FunctionQName, location: Location) -> None:
         self.qname: FunctionQName = qname
         self.location: Location = location
@@ -190,7 +192,7 @@ class FunctionUsage:
         }
 
 
-class ParameterUsage:
+class ParameterUsage(Usage):
     def __init__(self, qname: ParameterQName, location: Location) -> None:
         self.qname: ParameterQName = qname
         self.location: Location = location
@@ -202,7 +204,7 @@ class ParameterUsage:
         }
 
 
-class ValueUsage:
+class ValueUsage(Usage):
     def __init__(self, parameter_qname: ParameterQName, value: StringifiedValue, location: Location) -> None:
         self.parameter_qname: ParameterQName = parameter_qname
         self.value: StringifiedValue = value
