@@ -17,6 +17,7 @@ optional arguments:
 poetry shell
 library-analyzer api -p sklearn -o "/mnt/d/Kaggle Analysis/out"
 library-analyzer usages -p sklearn -s "/mnt/d/Kaggle Analysis/Kaggle Kernels" -t "/mnt/d/Kaggle Analysis/tmp" -o "/mnt/d/Kaggle Analysis/out"
+library-analyzer improve -a "/mnt/d/Kaggle Analysis/out/scikit-learn__sklearn__0.24.2__api.json" -u "/mnt/d/Kaggle Analysis/out/scikit-learn__sklearn__0.24.2__usages.json" -o "/mnt/d/Kaggle Analysis/out"
 ```
 
 Example query on `merged_count`:

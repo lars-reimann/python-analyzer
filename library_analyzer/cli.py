@@ -5,6 +5,7 @@ from pathlib import Path
 
 from .commands.find_usages import find_usages
 from .commands.get_public_api import distribution, distribution_version, get_public_api
+from .commands.suggest_improvements import suggest_improvements
 from .utils import ensure_file_exists
 
 __API_COMMAND = "api"
@@ -38,8 +39,7 @@ def cli() -> None:
             json.dump(usages.to_json(), f, indent=2)
 
     elif args.command == __IMPROVE_COMMAND:
-        # TODO
-        pass
+        suggest_improvements(args.api, args.usages, args.out, args.min)
 
 
 def __get_args() -> argparse.Namespace:
@@ -104,32 +104,42 @@ def __add_usages_subparser(subparsers: _SubParsersAction) -> None:
     usages_parser.add_argument(
         "-o",
         "--out",
-        help="Output file.",
+        help="Output directory.",
         type=Path,
         required=True
     )
 
-
-# TODO
 def __add_improve_subparser(subparsers: _SubParsersAction) -> None:
     improve_parser = subparsers.add_parser(
         __IMPROVE_COMMAND,
         help="Suggest how to improve an existing API."
     )
     improve_parser.add_argument(
-        "-s",
-        "--src",
-        help="Directory containing Python code.",
-        type=Path,
+        "-a",
+        "--api",
+        help="File created by the 'api' command.",
+        type=argparse.FileType('r'),
         required=True,
     )
     improve_parser.add_argument(
-        "-e",
-        "--exclude",
-        help="File with list of file names to exclude. Gets updated as Python source files are processed.",
-        type=Path,
+        "-u",
+        "--usages",
+        help="File created by the 'usages' command.",
+        type=argparse.FileType('r'),
         required=True,
     )
     improve_parser.add_argument(
-        "-o", "--out", help="Output file.", type=Path, required=True
+        "-o",
+        "--out",
+        help="Output directory.",
+        type=Path,
+        required=True
+    )
+    improve_parser.add_argument(
+        "-m",
+        "--min",
+        help="Minimum number of usages required to keep an API element.",
+        type=int,
+        required=False,
+        default=1
     )

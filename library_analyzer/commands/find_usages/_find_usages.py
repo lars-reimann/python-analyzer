@@ -32,6 +32,7 @@ def find_usages(package_name: str, src_dir: Path, tmp_dir: Path):
             [[package_name, it, exclude_file, tmp_dir] for it in python_files]
         )
     pool.join()
+    pool.close()
 
     return _merge_results(tmp_dir)
 

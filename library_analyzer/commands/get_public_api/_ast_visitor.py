@@ -97,4 +97,8 @@ class _CallableVisitor:
         if qualified_name in self.reexported:
             return True
 
+        # Containing class is re-exported
+        if ".".join(qualified_name.split(".")[:-1]) in self.reexported:
+            return True
+
         return all(not it.startswith("_") for it in qualified_name.split("."))
