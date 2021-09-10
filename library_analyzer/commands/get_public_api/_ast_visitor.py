@@ -2,6 +2,7 @@ from typing import Optional
 
 import astroid
 
+from library_analyzer.utils import parent_qname
 from ._file_filters import _is_init_file
 from ._model import API, Function, Parameter
 
@@ -39,6 +40,8 @@ class _CallableVisitor:
 
         if self.is_public(node.name, qname):
             self.api.add_class(qname)
+        else:
+            print(f"Skipping internal class {qname}")
 
     def enter_functiondef(self, node: astroid.FunctionDef) -> None:
         qname = node.qname()
@@ -46,6 +49,8 @@ class _CallableVisitor:
         if self.is_public(node.name, qname):
             if qname not in self.api.functions:
                 self.api.functions[qname] = Function(qname, self.__function_parameters(node))
+        else:
+            print(f"Skipping internal function {qname}")
 
     @staticmethod
     def __function_parameters(node: astroid.FunctionDef) -> list[Parameter]:
@@ -98,7 +103,7 @@ class _CallableVisitor:
             return True
 
         # Containing class is re-exported (always false if the current API element is not a method)
-        if ".".join(qualified_name.split(".")[:-1]) in self.reexported:
+        if parent_qname(qualified_name) in self.reexported:
             return True
 
         # The slicing is necessary so __init__ functions are not excluded (already handled in the first condition).

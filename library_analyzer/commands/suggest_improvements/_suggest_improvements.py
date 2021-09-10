@@ -4,6 +4,7 @@ from pathlib import Path
 
 from library_analyzer.commands.find_usages import UsageStore
 from library_analyzer.commands.get_public_api import API
+from library_analyzer.utils import parent_qname
 
 
 def suggest_improvements(
@@ -39,11 +40,19 @@ def remove_internal_usages(usages: UsageStore, public_api: API) -> None:
     # Internal classes
     for class_qname in list(usages.class_usages.keys()):
         if class_qname not in public_api.classes:
-            print(f"Removing usages of internal class {class_qname}.")
+            print(f"Removing usages of internal class {class_qname}")
             del usages.class_usages[class_qname]
 
     # Internal functions
     for function_qname in list(usages.function_usages.keys()):
         if function_qname not in public_api.functions:
-            print(f"Removing usages of internal function {function_qname}.")
+            print(f"Removing usages of internal function {function_qname}")
             del usages.function_usages[function_qname]
+
+    # Internal parameters
+    for parameter_qname in list(usages.parameter_usages.keys()):
+        function_qname = parent_qname(parameter_qname)
+        if function_qname not in public_api.functions:
+            print(f"Removing usages of internal parameter {parameter_qname}")
+            del usages.parameter_usages[parameter_qname]
+            del usages.value_usages[parameter_qname]
