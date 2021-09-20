@@ -27,8 +27,8 @@ def suggest_improvements(
 
     __preprocess_usages(usages, api)
     __create_usage_distributions(usages, out_dir, base_file_name)
-    __remove_rarely_used_api_elements(usages, min_usages, out_dir, base_file_name)
-    __write_api_size(api, out_dir, base_file_name)
+    api_size_after_removal = __remove_rarely_used_api_elements(usages, min_usages, out_dir, base_file_name)
+    __write_api_size(api, api_size_after_removal, out_dir, base_file_name)
     __optional_vs_required_parameters(usages, api, out_dir, base_file_name)
 
 
@@ -47,10 +47,9 @@ def __create_usage_distributions(usages: UsageStore, out_dir: Path, base_file_na
     with out_dir.joinpath(f"{base_file_name}__function_usage_distribution.json").open("w") as f:
         json.dump(function_usage_distribution, f, indent=2)
 
-    # TODO: comment back in
-    # parameter_usage_distribution = __create_parameter_usage_distribution(usages.parameter_usages, usages.value_usages)
-    # with out_dir.joinpath(f"{base_file_name}__parameter_usage_distribution.json").open("w") as f:
-    #     json.dump(parameter_usage_distribution, f, indent=2)
+    parameter_usage_distribution = __create_parameter_usage_distribution(usages.parameter_usages, usages.value_usages)
+    with out_dir.joinpath(f"{base_file_name}__parameter_usage_distribution.json").open("w") as f:
+        json.dump(parameter_usage_distribution, f, indent=2)
 
 
 def __remove_internal_usages(usages: UsageStore, api: API) -> None:
@@ -193,18 +192,45 @@ def __remove_rarely_used_api_elements(
     min_usages: int,
     out_dir: Path,
     base_file_name: str
-) -> None:
+) -> dict[str, Any]:
+    """
+    Removes API elements that are used fewer than min_usages times.
+
+    :return: The API size after the individual steps.
+    """
+
     rarely_used_classes = __remove_rarely_used_classes(usages, min_usages)
+    api_size_after_class_removal = __api_size_to_json(
+        len(usages.class_usages),
+        len(usages.function_usages),
+        len(usages.parameter_usages)
+    )
     with out_dir.joinpath(f"{base_file_name}__classes_used_fewer_than_{min_usages}_times.json").open("w") as f:
         json.dump(rarely_used_classes, f, indent=2)
 
     rarely_used_functions = __remove_rarely_used_functions(usages, min_usages)
+    api_size_after_function_removal = __api_size_to_json(
+        len(usages.class_usages),
+        len(usages.function_usages),
+        len(usages.parameter_usages)
+    )
     with out_dir.joinpath(f"{base_file_name}__functions_used_fewer_than_{min_usages}_times.json").open("w") as f:
         json.dump(rarely_used_functions, f, indent=2)
 
     rarely_used_parameters = __remove_rarely_used_parameters(usages, min_usages)
+    api_size_after_parameter_removal = __api_size_to_json(
+        len(usages.class_usages),
+        len(usages.function_usages),
+        len(usages.parameter_usages)
+    )
     with out_dir.joinpath(f"{base_file_name}__parameters_used_fewer_than_{min_usages}_times.json").open("w") as f:
         json.dump(rarely_used_parameters, f, indent=2)
+
+    return {
+        "after_class_removal": api_size_after_class_removal,
+        "after_function_removal": api_size_after_function_removal,
+        "after_parameter_removal": api_size_after_parameter_removal
+    }
 
 
 def __remove_rarely_used_classes(usages: UsageStore, min_usages: int) -> list[str]:
@@ -242,7 +268,12 @@ def __remove_rarely_used_parameters(usages: UsageStore, min_usages: int) -> list
     return sorted(result)
 
 
-def __write_api_size(api: API, out_dir: Path, base_file_name: str) -> None:
+def __write_api_size(
+    api: API,
+    api_size_after_removal: dict[str, Any],
+    out_dir: Path,
+    base_file_name: str
+) -> None:
     with out_dir.joinpath(f"{base_file_name}__api_size.json").open("w") as f:
         json.dump({
             "full": __api_size_to_json(
@@ -254,7 +285,10 @@ def __write_api_size(api: API, out_dir: Path, base_file_name: str) -> None:
                 api.public_class_count(),
                 api.public_function_count(),
                 api.public_parameter_count()
-            )
+            ),
+            "after_class_removal": api_size_after_removal["after_class_removal"],
+            "after_function_removal": api_size_after_removal["after_function_removal"],
+            "after_parameter_removal": api_size_after_removal["after_parameter_removal"]
         }, f, indent=2)
 
 
