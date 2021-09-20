@@ -1,9 +1,10 @@
 import json
 from io import TextIOWrapper
 from pathlib import Path
+from typing import Any
 
 from library_analyzer.commands.find_usages import UsageStore, Usage
-from library_analyzer.commands.get_public_api import API
+from library_analyzer.commands.get_api import API
 from library_analyzer.utils import parent_qname
 
 
@@ -15,7 +16,7 @@ def suggest_improvements(
 ):
     with api_file:
         api_json = json.load(api_file)
-        public_api = API.from_json(api_json)
+        api = API.from_json(api_json)
 
     with usages_file:
         usages_json = json.load(usages_file)
@@ -24,16 +25,17 @@ def suggest_improvements(
     out_dir.mkdir(parents=True, exist_ok=True)
     base_file_name = api_file.name.replace("__api.json", "")
 
-    __preprocess_usages(usages, public_api)
+    __preprocess_usages(usages, api)
     __create_usage_distributions(usages, out_dir, base_file_name)
-    __remove_rarely_used_api_elements(usages, min_usages, out_dir, base_file_name)
-    __optional_vs_required_parameters(usages, public_api, out_dir, base_file_name)
+    api_size_after_removal = __remove_rarely_used_api_elements(usages, min_usages, out_dir, base_file_name)
+    __write_api_size(api, api_size_after_removal, out_dir, base_file_name)
+    __optional_vs_required_parameters(usages, api, out_dir, base_file_name)
 
 
-def __preprocess_usages(usages: UsageStore, public_api: API) -> None:
-    __remove_internal_usages(usages, public_api)
-    __add_unused_api_elements(usages, public_api)
-    __add_implicit_usages_of_default_value(usages, public_api)
+def __preprocess_usages(usages: UsageStore, api: API) -> None:
+    __remove_internal_usages(usages, api)
+    __add_unused_api_elements(usages, api)
+    __add_implicit_usages_of_default_value(usages, api)
 
 
 def __create_usage_distributions(usages: UsageStore, out_dir: Path, base_file_name: str) -> None:
@@ -45,60 +47,64 @@ def __create_usage_distributions(usages: UsageStore, out_dir: Path, base_file_na
     with out_dir.joinpath(f"{base_file_name}__function_usage_distribution.json").open("w") as f:
         json.dump(function_usage_distribution, f, indent=2)
 
-    # parameter_usage_distribution = __create_parameter_usage_distribution(usages.parameter_usages, usages.value_usages)
-    # with out_dir.joinpath(f"{base_file_name}__parameter_usage_distribution.json").open("w") as f:
-    #     json.dump(parameter_usage_distribution, f, indent=2)
+    parameter_usage_distribution = __create_parameter_usage_distribution(usages.parameter_usages, usages.value_usages)
+    with out_dir.joinpath(f"{base_file_name}__parameter_usage_distribution.json").open("w") as f:
+        json.dump(parameter_usage_distribution, f, indent=2)
 
 
-def __remove_internal_usages(usages: UsageStore, public_api: API) -> None:
+def __remove_internal_usages(usages: UsageStore, api: API) -> None:
     """
     Removes usages of internal parts of the API. It might incorrectly remove some calls to methods that are inherited
     from internal classes into a public class but these are just fit/predict/etc., i.e. something we want to keep
     unchanged anyway.
 
     :param usages: Usage store
-    :param public_api: Description of the public API
+    :param api: Description of the API
     """
 
     # Internal classes
     for class_qname in list(usages.class_usages.keys()):
-        if class_qname not in public_api.classes:
+        if not api.is_public_class(class_qname):
             print(f"Removing usages of internal class {class_qname}")
             usages.remove_class(class_qname)
 
     # Internal functions
     for function_qname in list(usages.function_usages.keys()):
-        if function_qname not in public_api.functions:
+        if not api.is_public_function(function_qname):
             print(f"Removing usages of internal function {function_qname}")
             usages.remove_function(function_qname)
 
     # Internal parameters
+    parameter_qnames = set(api.parameters().keys())
+
     for parameter_qname in list(usages.parameter_usages.keys()):
         function_qname = parent_qname(parameter_qname)
-        if function_qname not in public_api.functions:
+        if parameter_qname not in parameter_qnames or not api.is_public_function(function_qname):
             print(f"Removing usages of internal parameter {parameter_qname}")
             usages.remove_parameter(parameter_qname)
 
 
-def __add_unused_api_elements(usages: UsageStore, public_api: API) -> None:
+def __add_unused_api_elements(usages: UsageStore, api: API) -> None:
     # Public classes
-    for class_qname in public_api.classes:
-        usages.init_class(class_qname)
+    for class_qname in api.classes:
+        if api.is_public_class(class_qname):
+            usages.init_class(class_qname)
 
     # Public functions
-    for function in public_api.functions.values():
-        usages.init_function(function.qname)
+    for function in api.functions.values():
+        if api.is_public_function(function.qname):
+            usages.init_function(function.qname)
 
-        # "Public" parameters
-        for parameter in function.parameters:
-            parameter_qname = f"{function.qname}.{parameter.name}"
-            usages.init_parameter(parameter_qname)
-            usages.init_value(parameter_qname)
+            # "Public" parameters
+            for parameter in function.parameters:
+                parameter_qname = f"{function.qname}.{parameter.name}"
+                usages.init_parameter(parameter_qname)
+                usages.init_value(parameter_qname)
 
 
-def __add_implicit_usages_of_default_value(usages: UsageStore, public_api: API) -> None:
+def __add_implicit_usages_of_default_value(usages: UsageStore, api: API) -> None:
     for parameter_qname, parameter_usage_list in list(usages.parameter_usages.items()):
-        default_value = public_api.get_default_value(parameter_qname)
+        default_value = api.get_default_value(parameter_qname)
         function_qname = parent_qname(parameter_qname)
         function_usage_list = usages.function_usages[function_qname]
 
@@ -186,18 +192,45 @@ def __remove_rarely_used_api_elements(
     min_usages: int,
     out_dir: Path,
     base_file_name: str
-) -> None:
+) -> dict[str, Any]:
+    """
+    Removes API elements that are used fewer than min_usages times.
+
+    :return: The API size after the individual steps.
+    """
+
     rarely_used_classes = __remove_rarely_used_classes(usages, min_usages)
+    api_size_after_class_removal = __api_size_to_json(
+        len(usages.class_usages),
+        len(usages.function_usages),
+        len(usages.parameter_usages)
+    )
     with out_dir.joinpath(f"{base_file_name}__classes_used_fewer_than_{min_usages}_times.json").open("w") as f:
         json.dump(rarely_used_classes, f, indent=2)
 
     rarely_used_functions = __remove_rarely_used_functions(usages, min_usages)
+    api_size_after_function_removal = __api_size_to_json(
+        len(usages.class_usages),
+        len(usages.function_usages),
+        len(usages.parameter_usages)
+    )
     with out_dir.joinpath(f"{base_file_name}__functions_used_fewer_than_{min_usages}_times.json").open("w") as f:
         json.dump(rarely_used_functions, f, indent=2)
 
     rarely_used_parameters = __remove_rarely_used_parameters(usages, min_usages)
+    api_size_after_parameter_removal = __api_size_to_json(
+        len(usages.class_usages),
+        len(usages.function_usages),
+        len(usages.parameter_usages)
+    )
     with out_dir.joinpath(f"{base_file_name}__parameters_used_fewer_than_{min_usages}_times.json").open("w") as f:
         json.dump(rarely_used_parameters, f, indent=2)
+
+    return {
+        "after_class_removal": api_size_after_class_removal,
+        "after_function_removal": api_size_after_function_removal,
+        "after_parameter_removal": api_size_after_parameter_removal
+    }
 
 
 def __remove_rarely_used_classes(usages: UsageStore, min_usages: int) -> list[str]:
@@ -233,6 +266,38 @@ def __remove_rarely_used_parameters(usages: UsageStore, min_usages: int) -> list
             usages.remove_parameter(parameter_qname)
 
     return sorted(result)
+
+
+def __write_api_size(
+    api: API,
+    api_size_after_removal: dict[str, Any],
+    out_dir: Path,
+    base_file_name: str
+) -> None:
+    with out_dir.joinpath(f"{base_file_name}__api_size.json").open("w") as f:
+        json.dump({
+            "full": __api_size_to_json(
+                api.class_count(),
+                api.function_count(),
+                api.parameter_count()
+            ),
+            "public": __api_size_to_json(
+                api.public_class_count(),
+                api.public_function_count(),
+                api.public_parameter_count()
+            ),
+            "after_class_removal": api_size_after_removal["after_class_removal"],
+            "after_function_removal": api_size_after_removal["after_function_removal"],
+            "after_parameter_removal": api_size_after_removal["after_parameter_removal"]
+        }, f, indent=2)
+
+
+def __api_size_to_json(n_classes: int, n_functions: int, n_parameters: int) -> Any:
+    return {
+        "n_classes": n_classes,
+        "n_functions": n_functions,
+        "n_parameters": n_parameters
+    }
 
 
 def __optional_vs_required_parameters(

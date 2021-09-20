@@ -4,7 +4,7 @@ import astroid
 
 from library_analyzer.utils import parent_qname
 from ._file_filters import _is_init_file
-from ._model import API, Function, Parameter
+from ._model import API, Function, Parameter, Class
 
 
 class _CallableVisitor:
@@ -38,22 +38,30 @@ class _CallableVisitor:
     def enter_classdef(self, node: astroid.ClassDef) -> None:
         qname = node.qname()
 
-        if self.is_public(node.name, qname):
-            self.api.add_class(qname)
-        else:
-            print(f"Skipping internal class {qname}")
+        if qname not in self.api.classes:
+            self.api.add_class(
+                Class(
+                    qname,
+                    self.is_public(node.name, qname)
+                )
+            )
 
     def enter_functiondef(self, node: astroid.FunctionDef) -> None:
         qname = node.qname()
 
-        if self.is_public(node.name, qname):
-            if qname not in self.api.functions:
-                self.api.functions[qname] = Function(qname, self.__function_parameters(node))
-        else:
-            print(f"Skipping internal function {qname}")
+        if qname not in self.api.functions:
+            is_public = self.is_public(node.name, qname)
+
+            self.api.add_function(
+                Function(
+                    qname,
+                    self.__function_parameters(node, is_public),
+                    is_public
+                )
+            )
 
     @staticmethod
-    def __function_parameters(node: astroid.FunctionDef) -> list[Parameter]:
+    def __function_parameters(node: astroid.FunctionDef, function_is_public: bool) -> list[Parameter]:
         parameters: astroid.Arguments = node.args
         n_implicit_parameters = node.implicit_parameters()
 
@@ -80,7 +88,7 @@ class _CallableVisitor:
         ]
 
         return [
-            Parameter(name, default)
+            Parameter(name, default, function_is_public)
             for name, default in result[n_implicit_parameters:]
             if name != "self"
         ]

@@ -4,7 +4,7 @@ from argparse import _SubParsersAction
 from pathlib import Path
 
 from .commands.find_usages import find_usages
-from .commands.get_public_api import distribution, distribution_version, get_public_api
+from .commands.get_api import distribution, distribution_version, get_api
 from .commands.suggest_improvements import suggest_improvements
 from .utils import ensure_file_exists
 
@@ -17,7 +17,7 @@ def cli() -> None:
     args = __get_args()
 
     if args.command == __API_COMMAND:
-        public_api = get_public_api(args.package)
+        public_api = get_api(args.package)
 
         out_dir: Path = args.out
         out_file = out_dir.joinpath(f"{public_api.distribution}__{public_api.package}__{public_api.version}__api.json")
@@ -57,7 +57,7 @@ def __get_args() -> argparse.Namespace:
 def __add_api_subparser(subparsers: _SubParsersAction) -> None:
     api_parser = subparsers.add_parser(
         __API_COMMAND,
-        help="List the public API of a package."
+        help="List the API of a package."
     )
     api_parser.add_argument(
         "-p",
