@@ -1,6 +1,7 @@
 import json
 from io import TextIOWrapper
 from pathlib import Path
+from typing import Any
 
 from library_analyzer.commands.find_usages import UsageStore, Usage
 from library_analyzer.commands.get_api import API
@@ -27,6 +28,7 @@ def suggest_improvements(
     __preprocess_usages(usages, api)
     __create_usage_distributions(usages, out_dir, base_file_name)
     __remove_rarely_used_api_elements(usages, min_usages, out_dir, base_file_name)
+    __write_api_size(api, out_dir, base_file_name)
     __optional_vs_required_parameters(usages, api, out_dir, base_file_name)
 
 
@@ -45,9 +47,10 @@ def __create_usage_distributions(usages: UsageStore, out_dir: Path, base_file_na
     with out_dir.joinpath(f"{base_file_name}__function_usage_distribution.json").open("w") as f:
         json.dump(function_usage_distribution, f, indent=2)
 
-    parameter_usage_distribution = __create_parameter_usage_distribution(usages.parameter_usages, usages.value_usages)
-    with out_dir.joinpath(f"{base_file_name}__parameter_usage_distribution.json").open("w") as f:
-        json.dump(parameter_usage_distribution, f, indent=2)
+    # TODO: comment back in
+    # parameter_usage_distribution = __create_parameter_usage_distribution(usages.parameter_usages, usages.value_usages)
+    # with out_dir.joinpath(f"{base_file_name}__parameter_usage_distribution.json").open("w") as f:
+    #     json.dump(parameter_usage_distribution, f, indent=2)
 
 
 def __remove_internal_usages(usages: UsageStore, api: API) -> None:
@@ -73,9 +76,11 @@ def __remove_internal_usages(usages: UsageStore, api: API) -> None:
             usages.remove_function(function_qname)
 
     # Internal parameters
+    parameter_qnames = set(api.parameters().keys())
+
     for parameter_qname in list(usages.parameter_usages.keys()):
         function_qname = parent_qname(parameter_qname)
-        if not api.is_public_function(function_qname):
+        if parameter_qname not in parameter_qnames or not api.is_public_function(function_qname):
             print(f"Removing usages of internal parameter {parameter_qname}")
             usages.remove_parameter(parameter_qname)
 
@@ -235,6 +240,30 @@ def __remove_rarely_used_parameters(usages: UsageStore, min_usages: int) -> list
             usages.remove_parameter(parameter_qname)
 
     return sorted(result)
+
+
+def __write_api_size(api: API, out_dir: Path, base_file_name: str) -> None:
+    with out_dir.joinpath(f"{base_file_name}__api_size.json").open("w") as f:
+        json.dump({
+            "full": __api_size_to_json(
+                api.class_count(),
+                api.function_count(),
+                api.parameter_count()
+            ),
+            "public": __api_size_to_json(
+                api.public_class_count(),
+                api.public_function_count(),
+                api.public_parameter_count()
+            )
+        }, f, indent=2)
+
+
+def __api_size_to_json(n_classes: int, n_functions: int, n_parameters: int) -> Any:
+    return {
+        "n_classes": n_classes,
+        "n_functions": n_functions,
+        "n_parameters": n_parameters
+    }
 
 
 def __optional_vs_required_parameters(
