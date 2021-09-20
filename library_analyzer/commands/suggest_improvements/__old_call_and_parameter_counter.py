@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from typing import Optional, Any
 
-from library_analyzer.commands.get_public_api import get_public_api
+from library_analyzer.commands.get_api import get_api
 from library_analyzer.utils import list_files
 
 # Type aliases
@@ -35,7 +35,7 @@ def _merge_results(out_dir: Path) -> tuple[ClassStore, CallStore, ParameterStore
 
     # Include all callables and parameters (and their default values) from relevant packages
     for package_name in _relevant_packages:
-        callables, classes = get_public_api(package_name)
+        callables, classes = get_api(package_name)
 
         for callable_name, parameters in callables.items():
             result_calls[callable_name] = []

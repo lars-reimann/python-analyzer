@@ -9,7 +9,7 @@ from ._model import API
 from ._package_metadata import distribution, distribution_version, package_files, package_root
 
 
-def get_public_api(package_name: str) -> API:
+def get_api(package_name: str) -> API:
     root = package_root(package_name)
     dist = distribution(package_name)
     dist_version = distribution_version(dist)
