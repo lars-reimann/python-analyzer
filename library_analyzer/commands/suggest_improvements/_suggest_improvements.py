@@ -47,9 +47,62 @@ def __create_usage_distributions(usages: UsageStore, out_dir: Path, base_file_na
     with out_dir.joinpath(f"{base_file_name}__function_usage_distribution.json").open("w") as f:
         json.dump(function_usage_distribution, f, indent=2)
 
-    parameter_usage_distribution = __create_parameter_usage_distribution(usages.parameter_usages, usages.value_usages)
+    parameter_usage_distribution = __create_parameter_usage_distribution(usages)
     with out_dir.joinpath(f"{base_file_name}__parameter_usage_distribution.json").open("w") as f:
         json.dump(parameter_usage_distribution, f, indent=2)
+
+
+def __create_class_or_function_usage_distribution(usages: dict[str, list[Usage]]) -> dict[int, int]:
+    """
+    Creates a dictionary X -> N where N indicates the number of classes/functions that are used at most X times.
+
+    :param usages: Usages of classes/functions.
+    :return: The usage distribution.
+    """
+
+    result = {}
+
+    max_usages = max(len(it) for it in usages.values())
+    for i in range(max_usages + 1):
+        result[i] = len([it for it in usages.values() if len(it) >= i])
+
+    return result
+
+
+def __create_parameter_usage_distribution(usages: UsageStore) -> dict[int, int]:
+    """
+    Creates a dictionary X -> N where N indicates the number of parameters that are set at most X times to a value other
+    than the most commonly used value (which might differ from the default value).
+
+    :param usages: Usage store.
+    :return: The usage distribution.
+    """
+
+    result = {}
+
+    parameter_usages = usages.parameter_usages
+    value_usages = usages.value_usages
+
+    max_usages = max(
+        __n_not_set_to_most_common_value(it, parameter_usages, value_usages)
+        for it in parameter_usages.keys()
+    )
+
+    for i in range(max_usages + 1):
+        result[i] = len(
+            [
+                it
+                for it in parameter_usages.keys()
+                if usages.n_function_usages(parent_qname(it)) >= i and
+                   (
+                       parent_qname(parent_qname(it)) not in usages.class_usages or
+                       usages.n_class_usages(parent_qname(parent_qname(it))) >= i
+                   ) and
+                   __n_not_set_to_most_common_value(it, parameter_usages, value_usages) >= i
+            ]
+        )
+
+    return result
 
 
 def __remove_internal_usages(usages: UsageStore, api: API) -> None:
@@ -117,55 +170,6 @@ def __add_implicit_usages_of_default_value(usages: UsageStore, api: API) -> None
         for location in locations_of_implicit_usages_of_default_value:
             usages.add_parameter_usage(parameter_qname, location)
             usages.add_value_usage(parameter_qname, default_value, location)
-
-
-def __create_class_or_function_usage_distribution(usages: dict[str, list[Usage]]) -> dict[int, int]:
-    """
-    Creates a dictionary X -> N where N indicates the number of classes/functions that are used at most X times.
-
-    :param usages: Usages of classes/functions.
-    :return: The usage distribution.
-    """
-
-    result = {}
-
-    max_usages = max(len(it) for it in usages.values())
-    for i in range(max_usages + 1):
-        result[i] = len([it for it in usages.values() if len(it) <= i])
-
-    return result
-
-
-def __create_parameter_usage_distribution(
-    parameter_usages: dict[str, list[Usage]],
-    value_usages: dict[str, dict[str, list[Usage]]]
-) -> dict[int, int]:
-    """
-    Creates a dictionary X -> N where N indicates the number of parameters that are set at most X times to a value other
-    than the most commonly used value (which might differ from the default value).
-
-    :param parameter_usages: Usages of parameters.
-    :param value_usages: Values assigned to parameters.
-    :return: The usage distribution.
-    """
-
-    result = {}
-
-    max_usages = max(
-        __n_not_set_to_most_common_value(it, parameter_usages, value_usages)
-        for it in parameter_usages.keys()
-    )
-
-    for i in range(max_usages + 1):
-        result[i] = len(
-            [
-                it
-                for it in parameter_usages.keys()
-                if __n_not_set_to_most_common_value(it, parameter_usages, value_usages) <= i
-            ]
-        )
-
-    return result
 
 
 def __n_not_set_to_most_common_value(
