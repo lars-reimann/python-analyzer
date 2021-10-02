@@ -11,7 +11,7 @@ library-analyzer = "library_analyzer.main:main"
 [tool.poetry.dependencies]
 python = "^3.9"
 astroid = "^2.8.0"
-scikit-learn = "^0.24.2"
+scikit-learn = "^1.0"
 importlib-metadata = "^4.8.1"
 
 [tool.poetry.dev-dependencies]
