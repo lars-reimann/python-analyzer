@@ -217,20 +217,36 @@ class UsageStore:
         return {
             "class_counts": {
                 qname: len(usages)
-                for qname, usages in sorted(self.class_usages.items(), key=lambda item: len(item[1]))
+                for qname, usages in sorted(
+                    self.class_usages.items(),
+                    key=lambda item: len(item[1]),
+                    reverse=True
+                )
             },
             "function_counts": {
                 qname: len(usages)
-                for qname, usages in sorted(self.function_usages.items(), key=lambda item: len(item[1]))
+                for qname, usages in sorted(
+                    self.function_usages.items(),
+                    key=lambda item: len(item[1]),
+                    reverse=True
+                )
             },
             "parameter_counts": {
                 qname: len(usages)
-                for qname, usages in sorted(self.parameter_usages.items(), key=lambda item: len(item[1]))
+                for qname, usages in sorted(
+                    self.parameter_usages.items(),
+                    key=lambda item: len(item[1]),
+                    reverse=True
+                )
             },
             "value_counts": {
                 parameter_qname: {
                     value: len(usages)
-                    for value, usages in sorted(values.items(), key=lambda item: len(item[1]))
+                    for value, usages in sorted(
+                        values.items(),
+                        key=lambda item: len(item[1]),
+                        reverse=True
+                    )
                 }
                 for parameter_qname, values in self.value_usages.items()
             }
