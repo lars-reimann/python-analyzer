@@ -38,13 +38,6 @@ def cli() -> None:
         with out_file.open("w") as f:
             json.dump(usages.to_json(), f, indent=2)
 
-        out_file = out_dir.joinpath(
-            f"{dist}__{args.package}__{distribution_version(dist)}__usage_counts.json"
-        )
-        ensure_file_exists(out_file)
-        with out_file.open("w") as f:
-            json.dump(usages.to_count_json(), f, indent=2)
-
     elif args.command == __IMPROVE_COMMAND:
         suggest_improvements(args.api, args.usages, args.out, args.min)
 

@@ -5,7 +5,7 @@ from typing import Any
 
 from library_analyzer.commands.find_usages import UsageStore, Usage
 from library_analyzer.commands.get_api import API
-from library_analyzer.utils import parent_qname
+from library_analyzer.utils import ensure_file_exists, parent_qname
 
 
 def suggest_improvements(
@@ -26,6 +26,7 @@ def suggest_improvements(
     base_file_name = api_file.name.replace("__api.json", "")
 
     __preprocess_usages(usages, api)
+    __print_usage_counts(usages, out_dir, base_file_name)
     __create_usage_distributions(usages, out_dir, base_file_name)
     api_size_after_removal = __remove_rarely_used_api_elements(usages, min_usages, out_dir, base_file_name)
     __write_api_size(api, api_size_after_removal, out_dir, base_file_name)
@@ -37,6 +38,14 @@ def __preprocess_usages(usages: UsageStore, api: API) -> None:
     __add_unused_api_elements(usages, api)
     __add_implicit_usages_of_default_value(usages, api)
 
+
+def __print_usage_counts(usages, out_dir, base_file_name):
+    out_file = out_dir.joinpath(
+        f"{base_file_name}__usage_counts.json"
+    )
+    ensure_file_exists(out_file)
+    with out_file.open("w") as f:
+        json.dump(usages.to_count_json(), f, indent=2)
 
 def __create_usage_distributions(usages: UsageStore, out_dir: Path, base_file_name: str) -> None:
     class_usage_distribution = __create_class_or_function_usage_distribution(usages.class_usages)
