@@ -69,11 +69,11 @@ optional arguments:
 2. Run the commands described above:
     ```shell
     # Step 1:
-    library-analyzer api -p sklearn -o "/Kaggle Analysis/out"
+    python-analyzer api -p sklearn -o "/Kaggle Analysis/out"
 
     # Step 2:
-    library-analyzer usages -p sklearn -s "/Kaggle Analysis/Kaggle Kernels" -t "/Kaggle Analysis/tmp" -o "/Kaggle Analysis/out"
+    python-analyzer usages -p sklearn -s "/Kaggle Analysis/Kaggle Kernels" -t "/Kaggle Analysis/tmp" -o "/Kaggle Analysis/out"
 
     # Step 3:
-    library-analyzer improve -a "/Kaggle Analysis/out/scikit-learn__sklearn__1.0__api.json" -u "/Kaggle Analysis/out/scikit-learn__sklearn__1.0__usages.json" -o "/Kaggle Analysis/out"
+    python-analyzer improve -a "/Kaggle Analysis/out/scikit-learn__sklearn__1.0__api.json" -u "/Kaggle Analysis/out/scikit-learn__sklearn__1.0__usages.json" -o "/Kaggle Analysis/out"
     ```

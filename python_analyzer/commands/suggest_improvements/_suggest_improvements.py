@@ -89,11 +89,12 @@ def __create_parameter_usage_distribution(usages: UsageStore) -> dict[int, int]:
 
     result = {}
 
+    function_usages = usages.function_usages
     parameter_usages = usages.parameter_usages
     value_usages = usages.value_usages
 
     max_usages = max(
-        __n_not_set_to_most_common_value(it, parameter_usages, value_usages)
+        __n_not_set_to_most_common_value(it, function_usages, value_usages)
         for it in parameter_usages.keys()
     )
 
@@ -107,7 +108,7 @@ def __create_parameter_usage_distribution(usages: UsageStore) -> dict[int, int]:
                        parent_qname(parent_qname(it)) not in usages.class_usages or
                        usages.n_class_usages(parent_qname(parent_qname(it))) >= i
                    ) and
-                   __n_not_set_to_most_common_value(it, parameter_usages, value_usages) >= i
+                   __n_not_set_to_most_common_value(it, function_usages, value_usages) >= i
             ]
         )
 
@@ -177,18 +178,17 @@ def __add_implicit_usages_of_default_value(usages: UsageStore, api: API) -> None
         )
 
         for location in locations_of_implicit_usages_of_default_value:
-            usages.add_parameter_usage(parameter_qname, location)
             usages.add_value_usage(parameter_qname, default_value, location)
 
 
 def __n_not_set_to_most_common_value(
     parameter_qname: str,
-    parameter_usages: dict[str, list[Usage]],
+    function_usages: dict[str, list[Usage]],
     value_usages: dict[str, dict[str, list[Usage]]]
 ) -> int:
     """Counts how often a parameter is set to a value other than the most commonly used value."""
 
-    n_total_usage = len(parameter_usages[parameter_qname])
+    n_total_usage = len(function_usages[parent_qname(parameter_qname)])
 
     # Parameter is unused
     # Checking both conditions even though one implies the other to ensure correctness of the program
@@ -213,7 +213,7 @@ def __remove_rarely_used_api_elements(
     """
 
     rarely_used_classes = __remove_rarely_used_classes(usages, min_usages)
-    api_size_after_class_removal = __api_size_to_json(
+    api_size_after_unused_class_removal = __api_size_to_json(
         len(usages.class_usages),
         len(usages.function_usages),
         len(usages.parameter_usages)
@@ -222,7 +222,7 @@ def __remove_rarely_used_api_elements(
         json.dump(rarely_used_classes, f, indent=2)
 
     rarely_used_functions = __remove_rarely_used_functions(usages, min_usages)
-    api_size_after_function_removal = __api_size_to_json(
+    api_size_after_unused_function_removal = __api_size_to_json(
         len(usages.class_usages),
         len(usages.function_usages),
         len(usages.parameter_usages)
@@ -231,7 +231,7 @@ def __remove_rarely_used_api_elements(
         json.dump(rarely_used_functions, f, indent=2)
 
     rarely_used_parameters = __remove_rarely_used_parameters(usages, min_usages)
-    api_size_after_parameter_removal = __api_size_to_json(
+    api_size_after_unused_parameter_removal = __api_size_to_json(
         len(usages.class_usages),
         len(usages.function_usages),
         len(usages.parameter_usages)
@@ -239,10 +239,20 @@ def __remove_rarely_used_api_elements(
     with out_dir.joinpath(f"{base_file_name}__parameters_used_fewer_than_{min_usages}_times.json").open("w") as f:
         json.dump(rarely_used_parameters, f, indent=2)
 
+    mostly_useless_parameters = __remove_mostly_useless_parameters(usages, min_usages)
+    api_size_after_useless_parameter_removal = __api_size_to_json(
+        len(usages.class_usages),
+        len(usages.function_usages),
+        len(usages.parameter_usages)
+    )
+    with out_dir.joinpath(f"{base_file_name}__parameters_set_fewer_than_{min_usages}_times_to_value_other_than_most_common.json").open("w") as f:
+        json.dump(mostly_useless_parameters, f, indent=2)
+
     return {
-        "after_class_removal": api_size_after_class_removal,
-        "after_function_removal": api_size_after_function_removal,
-        "after_parameter_removal": api_size_after_parameter_removal
+        "after_unused_class_removal": api_size_after_unused_class_removal,
+        "after_unused_function_removal": api_size_after_unused_function_removal,
+        "after_unused_parameter_removal": api_size_after_unused_parameter_removal,
+        "after_useless_parameter_removal": api_size_after_useless_parameter_removal
     }
 
 
@@ -267,12 +277,21 @@ def __remove_rarely_used_functions(usages: UsageStore, min_usages: int) -> list[
 
     return sorted(result)
 
-
 def __remove_rarely_used_parameters(usages: UsageStore, min_usages: int) -> list[str]:
     result = []
 
     for parameter_qname in list(usages.parameter_usages.keys()):
-        usage_count = __n_not_set_to_most_common_value(parameter_qname, usages.parameter_usages, usages.value_usages)
+        if usages.n_parameter_usages(parameter_qname) < min_usages:
+            result.append(parameter_qname)
+            usages.remove_parameter(parameter_qname)
+
+    return sorted(result)
+
+def __remove_mostly_useless_parameters(usages: UsageStore, min_usages: int) -> list[str]:
+    result = []
+
+    for parameter_qname in list(usages.parameter_usages.keys()):
+        usage_count = __n_not_set_to_most_common_value(parameter_qname, usages.function_usages, usages.value_usages)
 
         if usage_count < min_usages:
             result.append(parameter_qname)
@@ -299,9 +318,10 @@ def __write_api_size(
                 api.public_function_count(),
                 api.public_parameter_count()
             ),
-            "after_class_removal": api_size_after_removal["after_class_removal"],
-            "after_function_removal": api_size_after_removal["after_function_removal"],
-            "after_parameter_removal": api_size_after_removal["after_parameter_removal"]
+            "after_unused_class_removal": api_size_after_removal["after_unused_class_removal"],
+            "after_unused_function_removal": api_size_after_removal["after_unused_function_removal"],
+            "after_unused_parameter_removal": api_size_after_removal["after_unused_parameter_removal"],
+            "after_useless_parameter_removal": api_size_after_removal["after_useless_parameter_removal"]
         }, f, indent=2)
 
 
