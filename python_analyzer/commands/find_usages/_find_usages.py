@@ -4,7 +4,7 @@ from pathlib import Path
 
 import astroid
 
-from library_analyzer.utils import initialize_and_read_exclude_file, list_files, ASTWalker
+from python_analyzer.utils import initialize_and_read_exclude_file, list_files, ASTWalker
 from ._ast_visitor import _UsageFinder
 from ._model import UsageStore
 

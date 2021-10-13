@@ -2,7 +2,7 @@ from pathlib import Path
 
 import astroid
 
-from library_analyzer.utils import ASTWalker
+from python_analyzer.utils import ASTWalker
 from ._ast_visitor import _CallableVisitor
 from ._file_filters import _is_test_file
 from ._model import API

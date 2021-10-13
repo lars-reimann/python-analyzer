@@ -2,7 +2,7 @@ from typing import Optional
 
 import astroid
 
-from library_analyzer.utils import parent_qname
+from python_analyzer.utils import parent_qname
 from ._file_filters import _is_init_file
 from ._model import API, Function, Parameter, Class
 

@@ -2,8 +2,8 @@ import json
 from pathlib import Path
 from typing import Optional, Any
 
-from library_analyzer.commands.get_api import get_api
-from library_analyzer.utils import list_files
+from python_analyzer.commands.get_api import get_api
+from python_analyzer.utils import list_files
 
 # Type aliases
 ClassName = str

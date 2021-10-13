@@ -4,7 +4,7 @@ from typing import Optional
 
 from importlib_metadata import packages_distributions, version
 
-from library_analyzer.utils import list_files
+from python_analyzer.utils import list_files
 from ._file_filters import _is_init_file
 
 

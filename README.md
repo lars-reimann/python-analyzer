@@ -1,26 +1,79 @@
 # library-analyzer
 
+A tool to analyzer client and API code written in Python.
+
+## Usage
+
 ```text
-usage: library-analyzer [-h] {count} ...
+usage: python-analyzer [-h] {api,usages,improve} ...
 
 Analyze Python code.
 
 positional arguments:
-  {count}
-    count     Count how often functions are called/parameters are used and with which values.
+  {api,usages,improve}
+    api                 List the API of a package.
+    usages              Find usages of API elements.
+    improve             Suggest how to improve an existing API.
 
 optional arguments:
-  -h, --help  show this help message and exit
+  -h, --help            show this help message and exit
 ```
 
-```shell
-poetry shell
-library-analyzer api -p sklearn -o "/mnt/e/Kaggle Analysis/out"
-library-analyzer usages -p sklearn -s "/mnt/e/Kaggle Analysis/Kaggle Kernels" -t "/mnt/e/Kaggle Analysis/tmp" -o "/mnt/e/Kaggle Analysis/out"
-library-analyzer improve -a "/mnt/e/Kaggle Analysis/out/scikit-learn__sklearn__0.24.2__api.json" -u "/mnt/e/Kaggle Analysis/out/scikit-learn__sklearn__0.24.2__usages.json" -o "/mnt/e/Kaggle Analysis/out"
+### api command
+
+```text
+usage: python-analyzer api [-h] -p PACKAGE -o OUT
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -p PACKAGE, --package PACKAGE
+                        The name of the package. It must be installed in the current interpreter.
+  -o OUT, --out OUT     Output directory.
 ```
 
-Example query on `merged_count`:
-```js
-Object.values(merged_count.parameters).map(it => Object.values(it).filter(value => value < 1000).length).reduce((a, b) => a + b, 0)
+### usages command
+
+```text
+usage: python-analyzer usages [-h] -p PACKAGE -s SRC -t TMP -o OUT
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -p PACKAGE, --package PACKAGE
+                        The name of the package. It must be installed in the current interpreter.
+  -s SRC, --src SRC     Directory containing Python code.
+  -t TMP, --tmp TMP     Directory where temporary files can be stored (to save progress in case the program crashes).
+  -o OUT, --out OUT     Output directory.
 ```
+
+### improve command
+
+```text
+usage: python-analyzer improve [-h] -a API -u USAGES -o OUT [-m MIN]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -a API, --api API     File created by the 'api' command.
+  -u USAGES, --usages USAGES
+                        File created by the 'usages' command.
+  -o OUT, --out OUT     Output directory.
+  -m MIN, --min MIN     Minimum number of usages required to keep an API element.
+```
+
+### Example usage
+
+1. When running this locally with the cloned repository, create a shell with _poetry_:
+    ```shell
+    poetry shell
+    ```
+
+2. Run the commands described above:
+    ```shell
+    # Step 1:
+    library-analyzer api -p sklearn -o "/Kaggle Analysis/out"
+
+    # Step 2:
+    library-analyzer usages -p sklearn -s "/Kaggle Analysis/Kaggle Kernels" -t "/Kaggle Analysis/tmp" -o "/Kaggle Analysis/out"
+
+    # Step 3:
+    library-analyzer improve -a "/Kaggle Analysis/out/scikit-learn__sklearn__1.0__api.json" -u "/Kaggle Analysis/out/scikit-learn__sklearn__1.0__usages.json" -o "/Kaggle Analysis/out"
+    ```

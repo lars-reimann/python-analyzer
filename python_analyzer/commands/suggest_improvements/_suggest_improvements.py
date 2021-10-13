@@ -3,9 +3,9 @@ from io import TextIOWrapper
 from pathlib import Path
 from typing import Any
 
-from library_analyzer.commands.find_usages import UsageStore, Usage
-from library_analyzer.commands.get_api import API
-from library_analyzer.utils import ensure_file_exists, parent_qname
+from python_analyzer.commands.find_usages import UsageStore, Usage
+from python_analyzer.commands.get_api import API
+from python_analyzer.utils import ensure_file_exists, parent_qname
 
 
 def suggest_improvements(

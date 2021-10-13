@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from library_analyzer.utils import declaration_name, parent_qname
+from python_analyzer.utils import declaration_name, parent_qname
 
 
 class API:

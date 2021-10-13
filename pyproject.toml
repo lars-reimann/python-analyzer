@@ -1,12 +1,12 @@
 [tool.poetry]
-name = "library-analyzer"
+name = "python-analyzer"
 version = "0.0.1"
 description = "Analyze Python code."
 authors = ["Lars Reimann <mail@larsreimann.com>"]
 license = "MIT"
 
 [tool.poetry.scripts]
-library-analyzer = "library_analyzer.main:main"
+python-analyzer = "python_analyzer.main:main"
 
 [tool.poetry.dependencies]
 python = "^3.9"
