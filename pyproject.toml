@@ -10,7 +10,7 @@ python-analyzer = "python_analyzer.main:main"
 
 [tool.poetry.dependencies]
 python = "^3.9"
-astroid = "^2.8.5"
+astroid = "^2.9.0"
 scikit-learn = "^1.0"
 importlib-metadata = "^4.8.2"
 
