@@ -1,3 +1,7 @@
+**Development continues in the [api-editor](https://github.com/lars-reimann/api-editor) repository.**
+
+---------------
+
 # library-analyzer
 
 A tool to analyzer client and API code written in Python.
@@ -64,7 +68,7 @@ optional arguments:
 1. When running this locally with the cloned repository, create a shell with _poetry_:
     ```shell
     poetry shell
-    ```
+    ```n
 
 2. Run the commands described above:
     ```shell
